@@ -14,8 +14,8 @@ const (
 var _ Handler = &userHandler{}
 
 type userHandler struct {
-	UserService Service
 	mu sync.Mutex
+	UserService Service
 }
 
 type AppError struct {
