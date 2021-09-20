@@ -43,12 +43,12 @@ initdb:
 	  psql -U rexamp -d redisexamp -f /tmp/sql/initdb.sql
 
 build: clean deps
-	CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
+	CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./app/cmd/${SERVICE_NAME}/main.go
 
 run: clean clean_docker deps postgres redis initdb
 	DATABASE_URL=postgres://rexamp:password@localhost:5432/redisexamp?sslmode=disable \
 	REDIS=localhost:6379 \
-	go run ${CURRENT_DIR}/cmd/${SERVICE_NAME}/main.go
+	go run ${CURRENT_DIR}/app/cmd/${SERVICE_NAME}/main.go
 
 bench-install:
 	GOPATH=/tmp/ go get github.com/valyala/fasthttp

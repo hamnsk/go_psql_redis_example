@@ -1,0 +1,98 @@
+version: '3.7'
+services:
+  elasticsearch:
+    image: elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+
+  kibana:
+    container_name: kibana
+    image: kibana:7.14.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:7.5.10
+    environment:
+      - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - 3000:3000
+
+  go-redis:
+    build: .
+    container_name: go-redis-app
+    environment:
+      - DATABASE_URL=postgres://rexamp:password@postgres:5432/redisexamp?sslmode=disable
+      - REDIS=redis:6379
+    ports:
+      - 8080:8080
+    depends_on:
+      - redis
+      - postgres
+      - fluent-bit
+    logging:
+      driver: fluentd
+      options:
+        tag: go-redis-cache-app
+
+  redis:
+    container_name: redis
+    image: redis:6.2.1-alpine3.13
+
+  postgres:
+    container_name: postgres
+    image: postgres:12.5-alpine
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=rexamp
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=redisexamp
+    volumes:
+          - ./sql/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+
+
+  fluent-bit:
+    container_name: fluent-bit
+    image: fluent/fluent-bit:1.8
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/parsers.conf:/fluent-bit/parsers/parsers.conf:ro
+    depends_on:
+      - elasticsearch
+
+volumes:
+  elasticsearch-data:
+    driver: local
