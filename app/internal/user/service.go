@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"redis/pkg/logging"
 )
 
@@ -30,6 +31,8 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger) 
 
 func (s service) getByID(id string) (u User, err error) {
 	var cstatus string
+	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
+	defer timer.ObserveDuration()
 	defer trace(s.logger, id, &cstatus)()
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {

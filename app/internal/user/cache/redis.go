@@ -64,3 +64,7 @@ func (c *cache) Set(ctx context.Context, u user.User) error {
 
 	return c.client.Set(ctx, strconv.FormatInt(u.Id, 10), b.Bytes(), 25*time.Second).Err()
 }
+
+func (c *cache) PingClient(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}

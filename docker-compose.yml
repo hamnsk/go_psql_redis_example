@@ -1,0 +1,130 @@
+version: '3.7'
+services:
+  elasticsearch:
+    image: elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+
+  kibana:
+    container_name: kibana
+    image: kibana:7.14.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:7.5.10
+    environment:
+      - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
+      - GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_SIGNOUT_MENU=true
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - 3000:3000
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+
+  go-redis:
+    build: .
+    container_name: go-redis-app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS=${REDIS}
+      - SENTRY_DSN=${SENTRY_DSN}
+    ports:
+      - 8080:8080
+      - 8081:8081
+    depends_on:
+       redis:
+         condition: service_started
+       postgres:
+         condition: service_healthy
+       fluent-bit:
+         condition: service_started
+    logging:
+      driver: fluentd
+      options:
+        tag: go-redis-cache-app
+#     healthcheck:
+#       test: ["CMD", "curl", "-sS", "http://go-redis-app:8081/ready", "||", "exit", "1"]
+#       interval: 10s
+#       timeout: 10s
+#       retries: 5
+
+  redis:
+    container_name: redis
+    image: redis:6.2.1-alpine3.13
+
+  redis-exporter:
+    container_name: redis-exporter
+    image: oliver006/redis_exporter:alpine
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    depends_on:
+      - redis
+
+  postgres:
+    container_name: postgres
+    image: postgres:12.5-alpine
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=rexamp
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=redisexamp
+    volumes:
+      - ./sql/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "redisexamp", "-U", "rexamp"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  fluent-bit:
+    container_name: fluent-bit
+    image: fluent/fluent-bit:1.8
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/parsers.conf:/fluent-bit/parsers/parsers.conf:ro
+    depends_on:
+      - elasticsearch
+
+volumes:
+  elasticsearch-data:
+    driver: local
