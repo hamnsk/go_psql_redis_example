@@ -76,7 +76,7 @@ $ make stress
 
 For run and use ELK, Prometheus and Grafana run stack via docker-compose, before run make .env file with content:
 ```bazaar
-DATABASE_URL=postgres://rexamp:password@postgres:5432/redisexamp?sslmode=disable
+DATABASE_URL=postgres://rexamp:password@pgbouncer:6432/redisexamp?sslmode=disable
 REDIS=redis:6379 
 SENTRY_DSN=your_sentry_dsn
 ```
@@ -98,7 +98,7 @@ $ make ps-stack
 ```
 
 * Prometheus collect metrics from go-redis-app at port 8081 on /metrics url
-* Also collect metrics from Redis and Fluent-Bit services by default settings for this services
+* Also collect metrics from Redis, Pgbouncer and Fluent-Bit services by default settings for this services
 
 Work with prometheus historgram on [doc](https://prometheus.io/docs/practices/histograms/) or blog [post](https://www.robustperception.io/how-does-a-prometheus-histogram-work)
 
