@@ -108,6 +108,9 @@ Work with prometheus historgram on [doc](https://prometheus.io/docs/practices/hi
 * [Redis Dashboard](https://grafana.com/grafana/dashboards/763)
 * [Go Dashboard](https://grafana.com/grafana/dashboards/13240)
 * [Fluent-Bit Dashboard](https://github.com/fluent/fluent-bit-docs/tree/8172a24d278539a1420036a9434e9f56d987a040/monitoring/dashboard.json)
+* [PGbouncer Dashboard 1](https://grafana.com/grafana/dashboards/11806)
+* [PGbouncer Dashboard 2](https://grafana.com/grafana/dashboards/13353)
+
 
 ### Kubernetes Probes
 
