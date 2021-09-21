@@ -37,11 +37,14 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	user, err := h.UserService.getByID(id)
 	h.mu.Unlock()
+	getUserRequestsTotal.Inc()
 	if err != nil {
+		getUserRequestsError.Inc()
 		renderJSON(w, &AppError{Message: err.Error()}, http.StatusBadRequest)
 		h.UserService.error(err.Error())
 		return
 	}
+	getUserRequestsSuccess.Inc()
 	renderJSON(w, &user, http.StatusOK)
 }
 

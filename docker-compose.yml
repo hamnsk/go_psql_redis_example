@@ -34,6 +34,10 @@ services:
   prometheus:
     container_name: prometheus
     image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
       - 9090:9090
 
@@ -43,31 +47,55 @@ services:
     environment:
       - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=vertamedia-clickhouse-datasource,goshposh-metaqueries-datasource
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_SIGNOUT_MENU=true
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
       - 3000:3000
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
 
   go-redis:
     build: .
     container_name: go-redis-app
     environment:
-      - DATABASE_URL=postgres://rexamp:password@postgres:5432/redisexamp?sslmode=disable
-      - REDIS=redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS=${REDIS}
+      - SENTRY_DSN=${SENTRY_DSN}
     ports:
       - 8080:8080
+      - 8081:8081
     depends_on:
-      - redis
-      - postgres
-      - fluent-bit
+       redis:
+         condition: service_started
+       postgres:
+         condition: service_healthy
+       fluent-bit:
+         condition: service_started
     logging:
       driver: fluentd
       options:
         tag: go-redis-cache-app
+#     healthcheck:
+#       test: ["CMD", "curl", "-sS", "http://go-redis-app:8081/ready", "||", "exit", "1"]
+#       interval: 10s
+#       timeout: 10s
+#       retries: 5
 
   redis:
     container_name: redis
     image: redis:6.2.1-alpine3.13
+
+  redis-exporter:
+    container_name: redis-exporter
+    image: oliver006/redis_exporter:alpine
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    depends_on:
+      - redis
 
   postgres:
     container_name: postgres
@@ -78,8 +106,12 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=redisexamp
     volumes:
-          - ./sql/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
-
+      - ./sql/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "redisexamp", "-U", "rexamp"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
 
   fluent-bit:
     container_name: fluent-bit

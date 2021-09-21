@@ -34,10 +34,20 @@ func (p *db) FindOne(id string) (u user.User, err error) {
 
 	var res user.User
 
-	if err := p.pool.QueryRow(context.Background(), query, id).
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return user.User{}, err
+	}
+	defer conn.Release()
+
+	if err := conn.QueryRow(context.Background(), query, id).
 		Scan(&res.Id, &res.NickName, &res.FistName, &res.LastName, &res.Gender, &res.Pass, &res.Status); err != nil {
 		return user.User{}, err
 	}
 
 	return res, nil
+}
+
+func (p *db) PingPool(ctx context.Context) error {
+	return p.pool.Ping(ctx)
 }

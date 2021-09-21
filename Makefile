@@ -14,7 +14,7 @@ deps:
 clean:
 	rm -rf ./.bin/${SERVICE_NAME}
 
-clean_docker:
+clean-docker:
 	docker stop rpsql12 rredis6 || true && docker rm rpsql12 rredis6 || true
 
 postgres:
@@ -50,9 +50,28 @@ run: clean clean_docker deps postgres redis initdb
 	REDIS=localhost:6379 \
 	go run ${CURRENT_DIR}/app/cmd/${SERVICE_NAME}/main.go
 
+run-stack:
+	docker-compose -f docker-compose.yml up -d --build
+
+down-stack:
+	docker-compose -f docker-compose.yml down
+
+ps-stack:
+	docker-compose ps
+
+check-live:
+	curl -i http://localhost:8081/live
+
+check-ready:
+	curl -i http://localhost:8081/ready
+
 bench-install:
 	GOPATH=/tmp/ go get github.com/valyala/fasthttp
 	GOPATH=/tmp/ go get github.com/cmpxchg16/gobench
 
 stress:
-	/tmp/bin/gobench -u http://localhost:8080/user/1 -k=true -c 500 -t 10
+	echo "begin stress"; \
+	/tmp/bin/gobench -u http://localhost:8080/user/1 -k=true -c 500 -t 10 & \
+	/tmp/bin/gobench -u http://localhost:8080/user/6 -k=true -c 500 -t 10 & \
+	wait; \
+	echo "done"

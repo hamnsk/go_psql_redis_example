@@ -63,4 +63,8 @@ _deps
 *.txz
 
 /fluent-bit
+/monitoring
 /sql
+.env
+docker-compose.yml
+app.log
