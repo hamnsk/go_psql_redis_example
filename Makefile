@@ -1,5 +1,6 @@
 SERVICE_NAME := "redis-cache-example"
 CURRENT_DIR = $(shell pwd)
+GOPATH = $(shell echo ${HOME})
 ifdef BUILD_VERSION
 	VERSION := "-$(BUILD_VERSION)"
 else
@@ -9,7 +10,7 @@ endif
 .SILENT:
 
 deps:
-	go mod download
+	cd ${CURRENT_DIR}/app && go mod download
 
 clean:
 	rm -rf ./.bin/${SERVICE_NAME}
@@ -43,9 +44,10 @@ initdb:
 	  psql -U rexamp -d redisexamp -f /tmp/sql/initdb.sql
 
 build: clean deps
-	CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./app/cmd/${SERVICE_NAME}/main.go
+	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
 
-run: clean clean_docker deps postgres redis initdb
+run: clean clean-docker deps postgres redis initdb
+	cd ${CURRENT_DIR}/app && \
 	DATABASE_URL=postgres://rexamp:password@localhost:5432/redisexamp?sslmode=disable \
 	REDIS=localhost:6379 \
 	go run ${CURRENT_DIR}/app/cmd/${SERVICE_NAME}/main.go

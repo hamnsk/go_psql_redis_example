@@ -100,23 +100,7 @@ func main() {
 
 	<-c
 
-	logger.Info("Shutdown Application...")
-	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	err = srv.Shutdown(ctx)
-	if err != nil {
-		fatalServer(err, logger)
-	}
-	err = srvMon.Shutdown(ctx)
-	if err != nil {
-		fatalServer(err, logger)
-	}
-	serverCancel()
-	userStorage.Close()
-	err = userCache.Close()
-	if err != nil {
-		fatalServer(err, logger)
-	}
-	logger.Info("Application successful shutdown")
+	shutdown(logger, srv, srvMon, userStorage, userCache)
 }
 
 
@@ -124,4 +108,26 @@ func fatalServer(err error, l logging.Logger) {
 	sentry.CaptureException(err)
 	sentry.Flush(time.Second * 5)
 	l.Fatal(err.Error())
+}
+
+func shutdown(l logging.Logger, appSrv, monSrv *http.Server, storage user.Storage, cache user.Cache ) {
+
+	l.Info("Shutdown Application...")
+	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	err := appSrv.Shutdown(ctx)
+	if err != nil {
+		fatalServer(err, l)
+	}
+	err = monSrv.Shutdown(ctx)
+	if err != nil {
+		fatalServer(err, l)
+	}
+	serverCancel()
+	storage.Close()
+	err = cache.Close()
+	if err != nil {
+		fatalServer(err, l)
+	}
+	l.Info("Application successful shutdown")
+
 }
