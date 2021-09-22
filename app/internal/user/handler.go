@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -34,17 +35,28 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 
+	if _, err :=strconv.Atoi(id); err !=nil{
+		getUserRequestsTotal.Inc()
+		getUserRequestsError.Inc()
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		renderJSON(w, &AppError{Message: "nothing interresing"}, http.StatusTeapot)
+		h.UserService.error(err)
+		return
+	}
+
 	h.mu.Lock()
 	user, err := h.UserService.getByID(id)
 	h.mu.Unlock()
 	getUserRequestsTotal.Inc()
 	if err != nil {
 		getUserRequestsError.Inc()
-		renderJSON(w, &AppError{Message: err.Error()}, http.StatusBadRequest)
-		h.UserService.error(err.Error())
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
+		h.UserService.error(err)
 		return
 	}
 	getUserRequestsSuccess.Inc()
+	httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	renderJSON(w, &user, http.StatusOK)
 }
 

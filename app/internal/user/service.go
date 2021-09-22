@@ -3,8 +3,10 @@ package user
 import (
 	"context"
 	"fmt"
+	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"redis/pkg/logging"
+	"time"
 )
 
 var _ Service = &service{}
@@ -17,8 +19,8 @@ type service struct {
 
 type Service interface {
 	getByID(id string) (u User, err error)
-	error(msg string)
-	info(msg string)
+	error(err error)
+	info(err error)
 }
 
 func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger) (Service, error) {
@@ -36,12 +38,12 @@ func (s service) getByID(id string) (u User, err error) {
 	defer trace(s.logger, id, &cstatus)()
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
-		//s.logger.Debug("Cache hit for user id: " + id)
+		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
 		return u, nil
 	}
 	cstatus = "MISS"
-	//s.logger.Debug("Cache miss for user id: " + id)
+	s.logger.Debug("Cache miss for user id: " + id)
 	u, err = s.storage.FindOne(id)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
@@ -50,10 +52,12 @@ func (s service) getByID(id string) (u User, err error) {
 	return u, nil
 }
 
-func (s service) error(msg string) {
-	s.logger.Error(msg)
+func (s service) error(err error) {
+	sentry.CaptureException(err)
+	sentry.Flush(time.Second * 1)
+	s.logger.Error(err.Error())
 }
 
-func (s service) info(msg string) {
-	s.logger.Info(msg)
+func (s service) info(err error) {
+	s.logger.Info(err.Error())
 }
