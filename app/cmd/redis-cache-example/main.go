@@ -34,24 +34,18 @@ func main() {
 	router.Use(user.PrometheusHTTPDurationMiddleware)
 	userStorage, err := psql.NewStorage()
 	if err != nil {
-		sentry.CaptureException(err)
-		sentry.Flush(time.Second * 5)
-		logger.Fatal(err.Error())
+		fatalServer(err, logger)
 	}
 	userCache, err := cache.New()
 
 	if err != nil {
-		sentry.CaptureException(err)
-		sentry.Flush(time.Second * 5)
-		logger.Fatal(err.Error())
+		fatalServer(err, logger)
 	}
 
 	userService, err := user.NewService(userStorage, userCache, logger)
 
 	if err != nil {
-		sentry.CaptureException(err)
-		sentry.Flush(time.Second * 5)
-		logger.Fatal(err.Error())
+		fatalServer(err, logger)
 	}
 
 	userHandler := user.GetHandler(userService)
@@ -69,9 +63,7 @@ func main() {
 
 	go func(s *http.Server) {
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			sentry.CaptureException(err)
-			sentry.Flush(time.Second * 5)
-			logger.Sugar().Fatalf("Error on server startup: %s", err.Error())
+			fatalServer(err, logger)
 		}
 	}(srv)
 
@@ -95,9 +87,7 @@ func main() {
 
 	go func(s *http.Server) {
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			sentry.CaptureException(err)
-			sentry.Flush(time.Second * 5)
-			logger.Sugar().Fatalf("Error on server startup: %s", err.Error())
+			fatalServer(err, logger)
 		}
 	}(srvMon)
 
@@ -112,8 +102,26 @@ func main() {
 
 	logger.Info("Shutdown Application...")
 	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	srv.Shutdown(ctx)
-	srvMon.Shutdown(ctx)
+	err = srv.Shutdown(ctx)
+	if err != nil {
+		fatalServer(err, logger)
+	}
+	err = srvMon.Shutdown(ctx)
+	if err != nil {
+		fatalServer(err, logger)
+	}
 	serverCancel()
+	userStorage.Close()
+	err = userCache.Close()
+	if err != nil {
+		fatalServer(err, logger)
+	}
 	logger.Info("Application successful shutdown")
+}
+
+
+func fatalServer(err error, l logging.Logger) {
+	sentry.CaptureException(err)
+	sentry.Flush(time.Second * 5)
+	l.Fatal(err.Error())
 }
