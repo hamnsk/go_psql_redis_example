@@ -68,3 +68,7 @@ func (c *cache) Set(ctx context.Context, u user.User) error {
 func (c *cache) PingClient(ctx context.Context) error {
 	return c.client.Ping(ctx).Err()
 }
+
+func (c *cache) Close() error {
+	return c.client.Close()
+}
