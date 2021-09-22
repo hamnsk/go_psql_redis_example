@@ -37,6 +37,10 @@ $ make run
 
 #### This example Using Docker Container with Postgres 12
 
+> Good [article](https://habr.com/ru/company/oleg-bunin/blog/461935/) from the report on how to work with Postgres from GO (rus).
+> 
+> An [article](https://brandur.org/postgres-connections) about the speed of work of requests from the Postgres database with an increase in connections to it more than 100 (eng).
+
 ```shell script
 $ make postgres
 ```
