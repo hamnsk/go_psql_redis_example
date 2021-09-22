@@ -15,6 +15,7 @@ import (
 var getUserRequestsTotal prometheus.Gauge
 var getUserRequestsError prometheus.Gauge
 var getUserRequestsSuccess prometheus.Gauge
+var httpStatusCodes *prometheus.CounterVec
 
 var (
 	httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -26,8 +27,6 @@ var (
 		Help: "Duration of get user operations.",
 	}, []string{"id"})
 )
-
-
 
 func init() {
 	getUserRequestsTotal = prometheus.NewGauge(
@@ -50,6 +49,15 @@ func init() {
 			Help: "Success requests for user endpoint",
 		})
 	prometheus.MustRegister(getUserRequestsSuccess)
+
+	httpStatusCodes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "redis_cache_example_user_get_handler_request_total",
+			Help: "Total number of get users by HTTP status code.",
+		},
+		[]string{"code", "method"})
+
+	prometheus.MustRegister(httpStatusCodes)
 }
 
 func GoroutineCountCheck(threshold int) healthcheck.Check {
@@ -61,7 +69,6 @@ func GoroutineCountCheck(threshold int) healthcheck.Check {
 		return nil
 	}
 }
-
 
 func DatabasePingCheck(db Storage, timeout time.Duration) healthcheck.Check {
 	return func() error {
