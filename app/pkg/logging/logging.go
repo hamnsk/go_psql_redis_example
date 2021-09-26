@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"os"
 	"path"
+	"time"
 )
 
 var ee *zap.Logger
@@ -33,4 +34,16 @@ func init() {
 	}
 
 	ee, _ = config.Build()
+}
+
+func (l *Logger) String(key, val string) zap.Field {
+	return zap.String(key, val)
+}
+
+func (l *Logger) Int(key string, val int) zap.Field {
+	return zap.Int(key, val)
+}
+
+func (l *Logger) Duration(key string, time time.Duration) zap.Field{
+	return zap.Duration(key, time)
 }

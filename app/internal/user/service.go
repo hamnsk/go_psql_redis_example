@@ -6,6 +6,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"redis/pkg/logging"
+	"sync"
 	"time"
 )
 
@@ -13,8 +14,9 @@ var _ Service = &service{}
 
 type service struct {
 	storage Storage
-	cache Cache
-	logger logging.Logger
+	cache   Cache
+	logger  logging.Logger
+	mu *sync.Mutex
 }
 
 type Service interface {
@@ -26,20 +28,33 @@ type Service interface {
 func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger) (Service, error) {
 	return &service{
 		storage: userStorage,
-		cache: userCache,
-		logger: appLogger,
+		cache:   userCache,
+		logger:  appLogger,
+		mu: new(sync.Mutex),
 	}, nil
 }
 
 func (s service) getByID(id string) (u User, err error) {
 	var cstatus string
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
+	// register time for all operations steps
 	defer timer.ObserveDuration()
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus)()
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
+		// after success get user from cache refresh expire time for him
+		defer func(){
+			err := s.cache.Expire(context.Background(), id)
+			if err != nil {
+				s.logger.Error("Set cache expiration failed for user id: " + id)
+				s.error(err)
+			}
+		}()
 		return u, nil
 	}
 	cstatus = "MISS"
@@ -48,7 +63,10 @@ func (s service) getByID(id string) (u User, err error) {
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
 	}
-	_ = s.cache.Set(context.Background(), u)
+	// after get user from storage place him to cache with ttl
+	defer func() {
+		_ = s.cache.Set(context.Background(), u)
+	}()
 	return u, nil
 }
 

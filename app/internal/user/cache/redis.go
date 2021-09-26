@@ -62,7 +62,11 @@ func (c *cache) Set(ctx context.Context, u user.User) error {
 		return err
 	}
 
-	return c.client.Set(ctx, strconv.FormatInt(u.Id, 10), b.Bytes(), 25*time.Second).Err()
+	return c.client.Set(ctx, strconv.FormatInt(u.Id, 10), b.Bytes(), 25 * time.Second).Err()
+}
+
+func (c *cache) Expire(ctx context.Context, id string) error {
+	return c.client.Expire(ctx, id, 25 * time.Second).Err()
 }
 
 func (c *cache) PingClient(ctx context.Context) error {
