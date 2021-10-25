@@ -8,6 +8,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/heptiolabs/healthcheck v0.0.0-20180807145615-6ff867650f40
 	github.com/jackc/pgx/v4 v4.13.0
+	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.11.0
 	go.uber.org/zap v1.13.0
 )

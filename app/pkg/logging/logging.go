@@ -19,7 +19,18 @@ func GetLogger() Logger {
 }
 
 func init() {
+	logLevel :=map[string]zapcore.Level {
+		"DEBUG": zapcore.DebugLevel,
+		"INFO": zapcore.InfoLevel,
+		"ERROR": zapcore.ErrorLevel,
+		"WARN": zapcore.WarnLevel,
+	}
+
 	config := zap.NewProductionConfig()
+	level, ok := logLevel[os.Getenv("APP_LOG_LEVEL")]
+	if ok {
+		config.Level.SetLevel(level)
+	}
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder

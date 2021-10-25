@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"redis/internal/user"
+	"redis/pkg/logging"
 
+	"github.com/jackc/pgx/v4/log/zapadapter"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -14,8 +16,16 @@ type db struct {
 	pool *pgxpool.Pool
 }
 
-func NewStorage() (*db, error) {
-	pool, err := pgxpool.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+func NewStorage(appLogger *logging.Logger) (*db, error) {
+	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.ConnConfig.Logger = zapadapter.NewLogger(appLogger.Logger)
+	config.ConnConfig.PreferSimpleProtocol = true
+
+	pool, err := pgxpool.ConnectConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
