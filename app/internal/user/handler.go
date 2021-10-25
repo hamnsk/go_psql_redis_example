@@ -2,20 +2,20 @@ package user
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
 	"strconv"
-	"sync"
 )
 
 const (
 	userURL   = "/user/{id}"
+	searchURL = "/user/search/"
 )
 
 var _ Handler = &userHandler{}
 
 type userHandler struct {
-	mu sync.Mutex
 	UserService Service
 }
 
@@ -28,37 +28,77 @@ type Handler interface {
 }
 
 func (h *userHandler) Register(router *mux.Router) {
-	router.HandleFunc(userURL, h.getUserById)
+	router.HandleFunc(userURL, h.getUserById).Methods(http.MethodGet)
+	router.HandleFunc(searchURL, h.getUserByNickname).Methods(http.MethodGet)
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
+	// after response increment prometheus metrics
+	defer getUserRequestsTotal.Inc()
 
 	if _, err :=strconv.Atoi(id); err !=nil{
-		getUserRequestsTotal.Inc()
-		getUserRequestsError.Inc()
-		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		// after response increment prometheus metrics
+		defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		//render result to client
 		renderJSON(w, &AppError{Message: "nothing interresing"}, http.StatusTeapot)
 		h.UserService.error(err)
 		return
 	}
 
-	h.mu.Lock()
+	// call user service to get requested user from cache, if not found get from storage and place to cache
 	user, err := h.UserService.getByID(id)
-	h.mu.Unlock()
-	getUserRequestsTotal.Inc()
+
 	if err != nil {
-		getUserRequestsError.Inc()
-		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		// after response increment prometheus metrics
+		defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
 		return
 	}
-	getUserRequestsSuccess.Inc()
-	httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	// after response increment prometheus metrics
+	defer getUserRequestsSuccess.Inc()
+	// after response increment prometheus metrics
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	//render result to client
 	renderJSON(w, &user, http.StatusOK)
 }
+
+
+func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	nickname := r.FormValue("nickname")
+	fmt.Println(nickname)
+	// after response increment prometheus metrics
+	defer getUserRequestsTotal.Inc()
+
+	// call user service to get requested user from cache, if not found get from storage and place to cache
+	user, err := h.UserService.findByNickname(nickname)
+
+	if err != nil {
+		// after response increment prometheus metrics
+		defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		//render result to client
+		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
+		h.UserService.error(err)
+		return
+	}
+	// after response increment prometheus metrics
+	defer getUserRequestsSuccess.Inc()
+	// after response increment prometheus metrics
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	//render result to client
+	renderJSON(w, &user, http.StatusOK)
+}
+
 
 func GetHandler(userService Service) Handler {
 	h := userHandler{

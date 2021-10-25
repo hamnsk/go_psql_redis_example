@@ -9,6 +9,7 @@
 *.dll
 *.so
 *.dylib
+*.pprof
 
 # Test binary, built with `go test -c`
 *.test
@@ -18,6 +19,7 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+*.json
 
 ### Go Patch ###
 /vendor/
@@ -179,3 +181,4 @@ Temporary Items
 *.log
 out
 .env
+.pprof

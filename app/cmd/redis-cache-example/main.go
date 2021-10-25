@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"flag"
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/heptiolabs/healthcheck"
+	"github.com/pkg/profile"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +21,8 @@ import (
 
 func main() {
 
+	parseArgs()
+
 	logger := logging.GetLogger()
 	logger.Info("Application logger initialized.")
 
@@ -31,8 +35,8 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	router.Use(user.PrometheusHTTPDurationMiddleware)
-	userStorage, err := psql.NewStorage()
+	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
+	userStorage, err := psql.NewStorage(&logger)
 	if err != nil {
 		fatalServer(err, logger)
 	}
@@ -57,8 +61,8 @@ func main() {
 	srv := &http.Server{
 		Handler:      router,
 		Addr:         ":8080",
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
 
 	go func(s *http.Server) {
@@ -103,6 +107,27 @@ func main() {
 	shutdown(logger, srv, srvMon, userStorage, userCache)
 }
 
+func parseArgs() {
+	mode := flag.String("profile.mode", "", "enable profiling mode, one of [cpu, mem, mutex, block]")
+	flag.Parse()
+
+	switch *mode {
+	case "cpu":
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
+	case "mem":
+		defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+	case "mutex":
+		defer profile.Start(profile.MutexProfile, profile.ProfilePath(".")).Stop()
+	case "block":
+		defer profile.Start(profile.BlockProfile, profile.ProfilePath(".")).Stop()
+	case "trace":
+		defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
+	case "goroutine":
+		defer profile.Start(profile.GoroutineProfile, profile.ProfilePath(".")).Stop()
+	default:
+
+	}
+}
 
 func fatalServer(err error, l logging.Logger) {
 	sentry.CaptureException(err)

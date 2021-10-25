@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"redis/internal/user"
+	"redis/pkg/logging"
 
+	"github.com/jackc/pgx/v4/log/zapadapter"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -14,8 +16,16 @@ type db struct {
 	pool *pgxpool.Pool
 }
 
-func NewStorage() (*db, error) {
-	pool, err := pgxpool.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+func NewStorage(appLogger *logging.Logger) (*db, error) {
+	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.ConnConfig.Logger = zapadapter.NewLogger(appLogger.Logger)
+	config.ConnConfig.PreferSimpleProtocol = true
+
+	pool, err := pgxpool.ConnectConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +39,7 @@ func (p *db) Close() {
 	p.pool.Close()
 }
 
-func (p *db) FindOne(id string) (u user.User, err error) {
+func (p *db) GetByID(id string) (u user.User, err error) {
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE id = $1`
 
 	var res user.User
@@ -41,6 +51,26 @@ func (p *db) FindOne(id string) (u user.User, err error) {
 	defer conn.Release()
 
 	if err := conn.QueryRow(context.Background(), query, id).
+		Scan(&res.Id, &res.NickName, &res.FistName, &res.LastName, &res.Gender, &res.Pass, &res.Status); err != nil {
+		return user.User{}, err
+	}
+
+	return res, nil
+}
+
+
+func (p *db) FindOneByNickName(nickname string) (u user.User, err error) {
+	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE nickname LIKE $1 LIMIT 1`
+
+	var res user.User
+
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return user.User{}, err
+	}
+	defer conn.Release()
+
+	if err := conn.QueryRow(context.Background(), query, nickname).
 		Scan(&res.Id, &res.NickName, &res.FistName, &res.LastName, &res.Gender, &res.Pass, &res.Status); err != nil {
 		return user.User{}, err
 	}
