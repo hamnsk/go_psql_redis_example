@@ -22,17 +22,6 @@ func InitTracing(l *logging.Logger) (error, opentracing.Tracer, io.Closer) {
 	tracingCfg.Sampler.Type = jaeger.SamplerTypeRemote
 	tracingCfg.Sampler.Param = 1
 
-	//tracingCfg := jaegercfg.Configuration{
-	//	ServiceName: "redis_cache_go_example",
-	//	Sampler: &jaegercfg.SamplerConfig{
-	//		Type:  jaeger.SamplerTypeRemote,
-	//		Param: 1,
-	//	},
-	//	Reporter: &jaegercfg.ReporterConfig{
-	//		LogSpans: true,
-	//	},
-	//}
-
 	jLogger := jaegerlog.StdLogger
 	jMetricsFactory := prometheus.New()
 

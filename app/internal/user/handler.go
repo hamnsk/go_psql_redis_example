@@ -37,7 +37,13 @@ func (h *userHandler) Register(router *mux.Router) {
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	tracer := h.UserService.getTracer()
 	spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
-	serverSpan := tracer.StartSpan("server", ext.RPCServerOption(spanCtx))
+	serverSpan := tracer.StartSpan("get-user-by-id", ext.RPCServerOption(spanCtx))
+	serverSpan.SetTag("request_uri", r.RequestURI)
+	serverSpan.SetTag("request_body", r.Body)
+	serverSpan.SetTag("request_header", r.Header)
+	serverSpan.SetTag("request_method", r.Method)
+	serverSpan.SetTag("request_content_length", r.ContentLength)
+	serverSpan.SetTag("trace_id", r.Header.Get("Uber-Trace-Id"))
 	defer serverSpan.Finish()
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
