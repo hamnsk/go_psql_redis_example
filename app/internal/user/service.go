@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/getsentry/sentry-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"redis/pkg/logging"
 	"sync"
@@ -16,22 +17,25 @@ type service struct {
 	storage Storage
 	cache   Cache
 	logger  logging.Logger
-	mu *sync.Mutex
+	tracer  opentracing.Tracer
+	mu      *sync.Mutex
 }
 
 type Service interface {
 	getByID(id string) (u User, err error)
 	findByNickname(nickname string) (u User, err error)
+	getTracer() (t opentracing.Tracer)
 	error(err error)
 	info(err error)
 }
 
-func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger) (Service, error) {
+func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer opentracing.Tracer) (Service, error) {
 	return &service{
 		storage: userStorage,
 		cache:   userCache,
 		logger:  appLogger,
-		mu: new(sync.Mutex),
+		tracer:  appTracer,
+		mu:      new(sync.Mutex),
 	}, nil
 }
 
@@ -49,7 +53,7 @@ func (s service) getByID(id string) (u User, err error) {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
-		defer func(){
+		defer func() {
 			err := s.cache.Expire(context.Background(), id)
 			if err != nil {
 				s.logger.Error("Set cache expiration failed for user id: " + id)
@@ -84,7 +88,7 @@ func (s service) findByNickname(nickname string) (u User, err error) {
 	if err == nil {
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
-		defer func(){
+		defer func() {
 			err := s.cache.Expire(context.Background(), nickname)
 			if err != nil {
 				s.logger.Error("Set cache expiration failed for user id: " + nickname)
@@ -114,4 +118,8 @@ func (s service) error(err error) {
 
 func (s service) info(err error) {
 	s.logger.Info(err.Error())
+}
+
+func (s service) getTracer() (t opentracing.Tracer) {
+	return s.tracer
 }

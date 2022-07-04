@@ -15,6 +15,7 @@ import (
 	psql "redis/internal/user/db"
 	"redis/pkg/logging"
 	"redis/pkg/monitoring"
+	"redis/pkg/tracing"
 	"syscall"
 	"time"
 )
@@ -34,6 +35,14 @@ func main() {
 		logger.Fatal("Init Sentry failed: " + err.Error())
 	}
 
+	err, tracer, tCloser := tracing.InitTracing(&logger)
+
+	if err != nil {
+		fatalServer(err, logger)
+	} else {
+		defer tCloser.Close()
+	}
+
 	router := mux.NewRouter()
 	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
 	userStorage, err := psql.NewStorage(&logger)
@@ -46,7 +55,7 @@ func main() {
 		fatalServer(err, logger)
 	}
 
-	userService, err := user.NewService(userStorage, userCache, logger)
+	userService, err := user.NewService(userStorage, userCache, logger, tracer)
 
 	if err != nil {
 		fatalServer(err, logger)
@@ -54,7 +63,6 @@ func main() {
 
 	userHandler := user.GetHandler(userService)
 	userHandler.Register(router)
-
 
 	logger.Info("Starting server :8080")
 
@@ -80,7 +88,6 @@ func main() {
 	hc.AddReadinessCheck("cache", user.CachePingCheck(userCache, 1*time.Second))
 	metricsHandler := monitoring.GetHandler(logger)
 	metricsHandler.Register(metricsRouter, hc)
-
 
 	srvMon := &http.Server{
 		Handler:      metricsRouter,
@@ -135,7 +142,7 @@ func fatalServer(err error, l logging.Logger) {
 	l.Fatal(err.Error())
 }
 
-func shutdown(l logging.Logger, appSrv, monSrv *http.Server, storage user.Storage, cache user.Cache ) {
+func shutdown(l logging.Logger, appSrv, monSrv *http.Server, storage user.Storage, cache user.Cache) {
 
 	l.Info("Shutdown Application...")
 	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
