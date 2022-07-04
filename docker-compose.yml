@@ -1,5 +1,21 @@
 version: '3.7'
 services:
+  nginx:
+    image: opentracing/nginx-opentracing
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/jaeger-nginx-config.json:/etc/nginx/jaeger-nginx-config.json:ro
+    ports:
+      - "80:80"
+    logging:
+      driver: fluentd
+      options:
+        tag: jaeger
+    depends_on:
+      - fluent-bit
+      - go-redis
+
   elasticsearch:
     image: elasticsearch:7.14.0
     container_name: elasticsearch
