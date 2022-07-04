@@ -58,7 +58,6 @@ func (p *db) GetByID(id string) (u user.User, err error) {
 	return res, nil
 }
 
-
 func (p *db) FindOneByNickName(nickname string) (u user.User, err error) {
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE nickname LIKE $1 LIMIT 1`
 

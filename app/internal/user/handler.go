@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"net/http"
 	"strconv"
 )
@@ -33,12 +35,17 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
+	tracer := h.UserService.getTracer()
+	spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
+	serverSpan := tracer.StartSpan("server", ext.RPCServerOption(spanCtx))
+	defer serverSpan.Finish()
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
+	serverSpan.SetTag("user_id", id)
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
-	if _, err :=strconv.Atoi(id); err !=nil{
+	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
 		defer getUserRequestsError.Inc()
 		// after response increment prometheus metrics
@@ -70,7 +77,6 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	renderJSON(w, &user, http.StatusOK)
 }
 
-
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	nickname := r.FormValue("nickname")
@@ -99,7 +105,6 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	renderJSON(w, &user, http.StatusOK)
 }
 
-
 func GetHandler(userService Service) Handler {
 	h := userHandler{
 		UserService: userService,
@@ -107,8 +112,7 @@ func GetHandler(userService Service) Handler {
 	return &h
 }
 
-
-func renderJSON (w http.ResponseWriter, val interface{}, statusCode int) {
+func renderJSON(w http.ResponseWriter, val interface{}, statusCode int) {
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(val)
 }

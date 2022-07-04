@@ -65,6 +65,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS=${REDIS}
       - SENTRY_DSN=${SENTRY_DSN}
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -98,6 +100,19 @@ services:
       - REDIS_ADDR=redis://redis:6379
     depends_on:
       - redis
+
+  jaeger:
+    container_name: jaeger
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+#    logging:
+#      driver: fluentd
+#      options:
+#        tag: jaeger
+#    depends_on:
+#      - fluent-bit
 
   postgres:
     container_name: postgres

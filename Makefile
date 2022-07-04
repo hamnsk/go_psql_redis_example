@@ -37,6 +37,13 @@ redis:
       --name rredis6 \
       redis:6.2.1-alpine3.13
 
+jaeger:
+	docker run \
+	  -d \
+	  -p 6831:6831/udp \
+	  -p 16686:16686 \
+	  --name rjaeger \
+	  jaegertracing/all-in-one:latest
 initdb:
 	sleep 5
 	docker exec \
@@ -46,7 +53,7 @@ initdb:
 build: clean deps
 	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
 
-run: clean clean-docker deps postgres redis initdb
+run: clean clean-docker deps postgres redis initdb jaeger
 	cd ${CURRENT_DIR}/app && \
 	DATABASE_URL=postgres://rexamp:password@localhost:5432/redisexamp?sslmode=disable \
 	REDIS=localhost:6379 \
@@ -79,3 +86,6 @@ stress:
 	/tmp/bin/gobench -u http://localhost:8080/user/647564 -k=true -c 100 -t 360 & \
 	wait; \
 	echo "done"
+
+
+#/tmp/bin/gobench -u https://vault.k11s.cloud.vsk.local/ui -k=true -c 100 -t 360
