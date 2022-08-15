@@ -11,11 +11,12 @@ This example starts an http server on port 8080 at any available ip address.
 1. Go 1.17
 2. [PostgreSQL](#postgresql): either a remote instance, local binary or docker container.
 3. [Redis](#redis): either a remote instance, local binary or docker container.
-4. [Load testing data](#load-testing-data): included in this repo
-5. [Benchmark tests](#benchmark-tests): use a gobench tool
-6. [Prometheus Metrics](#prometheus-metrics): about collected metrics
-7. [Grafana Dashboards](#grafana-dashboards): recommended for use with this stack
-8. [Kubernetes Probes](#kubernetes-probes): app k8s probes
+4. [Jaeger](#jaeger): either a remote instance, local binary or docker container.
+5. [Load testing data](#load-testing-data): included in this repo
+6. [Benchmark tests](#benchmark-tests): use a gobench tool
+7. [Prometheus Metrics](#prometheus-metrics): about collected metrics
+8. [Grafana Dashboards](#grafana-dashboards): recommended for use with this stack
+9. [Kubernetes Probes](#kubernetes-probes): app k8s probes
 
 ## Running
 
@@ -51,6 +52,14 @@ $ make postgres
 
 ```shell script
 $ make redis
+```
+
+### Jaeger
+
+#### This example Using Docker Container with Jaeger
+
+```shell script
+$ make jaeger
 ```
 
 ### Load testing data
