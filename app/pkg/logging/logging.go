@@ -19,11 +19,11 @@ func GetLogger() Logger {
 }
 
 func init() {
-	logLevel :=map[string]zapcore.Level {
+	logLevel := map[string]zapcore.Level{
 		"DEBUG": zapcore.DebugLevel,
-		"INFO": zapcore.InfoLevel,
+		"INFO":  zapcore.InfoLevel,
 		"ERROR": zapcore.ErrorLevel,
-		"WARN": zapcore.WarnLevel,
+		"WARN":  zapcore.WarnLevel,
 	}
 
 	config := zap.NewProductionConfig()
@@ -55,6 +55,18 @@ func (l *Logger) Int(key string, val int) zap.Field {
 	return zap.Int(key, val)
 }
 
-func (l *Logger) Duration(key string, time time.Duration) zap.Field{
+func (l *Logger) Duration(key string, time time.Duration) zap.Field {
 	return zap.Duration(key, time)
+}
+
+func (l *Logger) Error(msg string) {
+	l.Logger.Sugar().Error(msg)
+}
+
+func (l *Logger) Infof(msg string, args ...interface{}) {
+	l.Logger.Sugar().Infof(msg, args...)
+}
+
+func (l *Logger) Debugf(msg string, args ...interface{}) {
+	l.Logger.Sugar().Debugf(msg, args...)
 }
