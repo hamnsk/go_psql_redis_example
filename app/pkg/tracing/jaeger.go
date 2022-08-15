@@ -4,7 +4,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber/jaeger-client-go"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
-	jaegerlog "github.com/uber/jaeger-client-go/log"
 	"github.com/uber/jaeger-lib/metrics/prometheus"
 	"io"
 	"redis/pkg/logging"
@@ -22,11 +21,10 @@ func InitTracing(l *logging.Logger) (error, opentracing.Tracer, io.Closer) {
 	tracingCfg.Sampler.Type = jaeger.SamplerTypeRemote
 	tracingCfg.Sampler.Param = 1
 
-	jLogger := jaegerlog.StdLogger
 	jMetricsFactory := prometheus.New()
 
 	tracer, closer, err := tracingCfg.NewTracer(
-		jaegercfg.Logger(jLogger),
+		jaegercfg.Logger(l),
 		jaegercfg.Metrics(jMetricsFactory),
 	)
 

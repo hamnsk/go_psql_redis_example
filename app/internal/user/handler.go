@@ -57,7 +57,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		// after response increment prometheus metrics
 		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
-		renderJSON(w, &AppError{Message: "nothing interresing"}, http.StatusTeapot)
+		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
 		return
 	}
