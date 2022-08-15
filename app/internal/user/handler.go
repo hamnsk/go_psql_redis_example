@@ -1,11 +1,11 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
+	"go.opentelemetry.io/otel/attribute"
 	"net/http"
 	"strconv"
 )
@@ -35,19 +35,23 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tracer := h.UserService.getTracer()
-	spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
-	serverSpan := tracer.StartSpan("get-user-by-id", ext.RPCServerOption(spanCtx))
-	serverSpan.SetTag("request_uri", r.RequestURI)
-	serverSpan.SetTag("request_body", r.Body)
-	serverSpan.SetTag("request_header", r.Header)
-	serverSpan.SetTag("request_method", r.Method)
-	serverSpan.SetTag("request_content_length", r.ContentLength)
-	serverSpan.SetTag("trace_id", r.Header.Get("Uber-Trace-Id"))
-	defer serverSpan.Finish()
+	tr := tracer.Tracer("get-user-by-id-handler")
+	_, span := tr.Start(ctx, "get-user")
+
+	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
+	//span.SetAttributes(attribute.Key("request_body").String(r.Body))
+	//span.SetAttributes(attribute.Key("request_header").String(r.Header))
+	span.SetAttributes(attribute.Key("request_method").String(r.Method))
+	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
+	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+
+	defer span.End()
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
-	serverSpan.SetTag("user_id", id)
+	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
@@ -59,6 +63,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
+		span.SetStatus(http.StatusTeapot, "Hello from teapot")
 		return
 	}
 
@@ -73,6 +78,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
+		span.SetStatus(http.StatusNotFound, "Not found user by id")
 		return
 	}
 	// after response increment prometheus metrics
@@ -81,6 +87,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
 	renderJSON(w, &user, http.StatusOK)
+	span.SetStatus(http.StatusOK, "All ok!")
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {

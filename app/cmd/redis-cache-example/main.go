@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/heptiolabs/healthcheck"
 	"github.com/pkg/profile"
+	"go.opentelemetry.io/otel"
 	"net/http"
 	"os"
 	"os/signal"
@@ -35,12 +36,12 @@ func main() {
 		logger.Fatal("Init Sentry failed: " + err.Error())
 	}
 
-	err, tracer, tCloser := tracing.InitTracing(&logger)
+	err, tracer := tracing.InitTracing(&logger)
+
+	otel.SetTracerProvider(tracer)
 
 	if err != nil {
 		fatalServer(err, logger)
-	} else {
-		defer tCloser.Close()
 	}
 
 	router := mux.NewRouter()

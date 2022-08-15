@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/getsentry/sentry-go"
-	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"redis/pkg/logging"
 	"sync"
 	"time"
@@ -17,19 +17,19 @@ type service struct {
 	storage Storage
 	cache   Cache
 	logger  logging.Logger
-	tracer  opentracing.Tracer
+	tracer  *tracesdk.TracerProvider
 	mu      *sync.Mutex
 }
 
 type Service interface {
 	getByID(id string) (u User, err error)
 	findByNickname(nickname string) (u User, err error)
-	getTracer() (t opentracing.Tracer)
+	getTracer() (t *tracesdk.TracerProvider)
 	error(err error)
 	info(err error)
 }
 
-func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer opentracing.Tracer) (Service, error) {
+func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer *tracesdk.TracerProvider) (Service, error) {
 	return &service{
 		storage: userStorage,
 		cache:   userCache,
@@ -120,6 +120,6 @@ func (s service) info(err error) {
 	s.logger.Info(err.Error())
 }
 
-func (s service) getTracer() (t opentracing.Tracer) {
+func (s service) getTracer() (t *tracesdk.TracerProvider) {
 	return s.tracer
 }
