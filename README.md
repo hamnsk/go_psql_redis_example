@@ -2,9 +2,23 @@
 
 This is an example of a simple microservice written in go. Microservice gives us the requested ID from the user database. After getting from the database, the query result is cached in Redis for 25 seconds. For logging, a zap is used, a gorilla / mux is selected as a router. For stack trace of errors use Sentry.
 
-This example starts an http server on port 8080 at any available ip address.
+This example starts a http server on port 8080 at any available ip address.
+
+Supported environment variables:
 
 > Set APP_LOG_FILE=file_name environment variable for enable output logs in project dir to file_name.
+> 
+> Set APP_LOG_LEVEL=DEBUG|ERROR|WARNING|INFO environment variable to change log level
+> 
+> Set JAEGER_AGENT_HOST=localhost environment variable for chose Jaeger ip address
+> 
+> Set JAEGER_AGENT_HOST=6831 environment variable for chose Jaeger port
+> 
+> Set DATABASE_URL=postgres://rexamp:password@pgbouncer:6432/redisexamp?sslmode=disable environment variable for DB
+> 
+> Set REDIS=redis:6379 environment variable for Redis
+> 
+> Set SENTRY_DSN=your_sentry_dsn environment variable for Sentry Tracing
 
 ## Requirements
 
