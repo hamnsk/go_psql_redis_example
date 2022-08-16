@@ -18,7 +18,7 @@ type service struct {
 	cache   Cache
 	logger  logging.Logger
 	tracer  opentracing.Tracer
-	mu      *sync.Mutex
+	mu      *sync.RWMutex
 }
 
 type Service interface {
@@ -35,20 +35,22 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 		cache:   userCache,
 		logger:  appLogger,
 		tracer:  appTracer,
-		mu:      new(sync.Mutex),
+		mu:      new(sync.RWMutex),
 	}, nil
 }
 
 func (s service) getByID(id string) (u User, err error) {
 	var cstatus string
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	//s.mu.Lock()
+	//defer s.mu.Unlock()
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
 	// register time for all operations steps
 	defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus)()
+	s.mu.RLock()
 	u, err = s.cache.Get(context.Background(), id)
+	s.mu.RUnlock()
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
@@ -70,7 +72,13 @@ func (s service) getByID(id string) (u User, err error) {
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
-		_ = s.cache.Set(context.Background(), u)
+		s.mu.Lock()
+		err = s.cache.Set(context.Background(), u)
+		s.mu.Unlock()
+		if err != nil {
+			s.logger.Error(err.Error())
+		}
+		s.logger.Debug("Write to cache user by id: " + id)
 	}()
 	return u, nil
 }
