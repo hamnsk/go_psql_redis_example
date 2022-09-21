@@ -63,7 +63,12 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err := h.UserService.getByID(id)
+	workHash := fmt.Sprintf("getUserByID:%s", id)
+
+	s := h.UserService.getSingleFlightGroup()
+	user, err, _ := s.Do(workHash, func() (interface{}, error) {
+		return h.UserService.getByID(id)
+	})
 
 	if err != nil {
 		// after response increment prometheus metrics
@@ -86,12 +91,16 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	nickname := r.FormValue("nickname")
-	fmt.Println(nickname)
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
 	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err := h.UserService.findByNickname(nickname)
+	workHash := fmt.Sprintf("getUserByNickname:%s", nickname)
+
+	s := h.UserService.getSingleFlightGroup()
+	user, err, _ := s.Do(workHash, func() (interface{}, error) {
+		return h.UserService.findByNickname(nickname)
+	})
 
 	if err != nil {
 		// after response increment prometheus metrics

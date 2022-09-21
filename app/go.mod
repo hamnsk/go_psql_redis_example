@@ -14,6 +14,7 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	go.uber.org/zap v1.13.0
+	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 )
 
 require (

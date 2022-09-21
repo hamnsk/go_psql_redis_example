@@ -6,8 +6,8 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
-	"sync"
 	"time"
 )
 
@@ -18,13 +18,14 @@ type service struct {
 	cache   Cache
 	logger  logging.Logger
 	tracer  opentracing.Tracer
-	mu      *sync.RWMutex
+	sflight *singleflight.Group
 }
 
 type Service interface {
 	getByID(id string) (u User, err error)
 	findByNickname(nickname string) (u User, err error)
 	getTracer() (t opentracing.Tracer)
+	getSingleFlightGroup() (sfg *singleflight.Group)
 	error(err error)
 	info(err error)
 }
@@ -35,22 +36,18 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 		cache:   userCache,
 		logger:  appLogger,
 		tracer:  appTracer,
-		mu:      new(sync.RWMutex),
+		sflight: &singleflight.Group{},
 	}, nil
 }
 
 func (s service) getByID(id string) (u User, err error) {
 	var cstatus string
-	//s.mu.Lock()
-	//defer s.mu.Unlock()
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
 	// register time for all operations steps
 	defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus)()
-	s.mu.RLock()
 	u, err = s.cache.Get(context.Background(), id)
-	s.mu.RUnlock()
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
@@ -72,9 +69,7 @@ func (s service) getByID(id string) (u User, err error) {
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
-		s.mu.Lock()
 		err = s.cache.Set(context.Background(), u)
-		s.mu.Unlock()
 		if err != nil {
 			s.logger.Error(err.Error())
 		}
@@ -85,8 +80,6 @@ func (s service) getByID(id string) (u User, err error) {
 
 func (s service) findByNickname(nickname string) (u User, err error) {
 	var cstatus string
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(nickname))
 	// register time for all operations steps
 	defer timer.ObserveDuration()
@@ -130,4 +123,8 @@ func (s service) info(err error) {
 
 func (s service) getTracer() (t opentracing.Tracer) {
 	return s.tracer
+}
+
+func (s service) getSingleFlightGroup() (sfg *singleflight.Group) {
+	return s.sflight
 }
