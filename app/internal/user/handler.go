@@ -45,23 +45,23 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	serverSpan.SetTag("request_method", r.Method)
 	serverSpan.SetTag("request_content_length", r.ContentLength)
 	serverSpan.SetTag("trace_id", r.Header.Get("Uber-Trace-Id"))
-	defer serverSpan.Finish()
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 	serverSpan.SetTag("user_id", id)
-	// after response increment prometheus metrics
-	defer getUserRequestsTotal.Inc()
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
 	// register time for all operations steps
 
 	if _, err := strconv.Atoi(id); err != nil {
-		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
-		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
+
+		// after response increment prometheus metrics
+		defer func() {
+			getUserRequestsError.Inc()
+			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+			timer.ObserveDuration()
+		}()
 		return
 	}
 
@@ -77,29 +77,31 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	h.UserService.info(fmt.Sprintf("Result %s is shared: %t", workHash, shared))
 
 	if err != nil {
-		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
-		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
+		// after response increment prometheus metrics
+		defer func() {
+			getUserRequestsError.Inc()
+			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+			timer.ObserveDuration()
+		}()
 		return
 	}
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
-	//render result to client
-	defer timer.ObserveDuration()
+	defer func() {
+		serverSpan.Finish()
+		getUserRequestsTotal.Inc()
+		getUserRequestsSuccess.Inc()
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+		timer.ObserveDuration()
+	}()
 	renderJSON(w, &user, http.StatusOK)
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	nickname := r.FormValue("nickname")
-	// after response increment prometheus metrics
-	defer getUserRequestsTotal.Inc()
 
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(nickname))
 	// register time for all operations steps
@@ -115,21 +117,29 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	})
 
 	if err != nil {
-		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
-		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
+
+		// after response increment prometheus metrics
+		defer func() {
+			getUserRequestsError.Inc()
+			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+			timer.ObserveDuration()
+		}()
+
 		return
 	}
+
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	defer func() {
+		getUserRequestsTotal.Inc()
+		getUserRequestsSuccess.Inc()
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+		timer.ObserveDuration()
+	}()
+
 	//render result to client
-	defer timer.ObserveDuration()
 	renderJSON(w, &user, http.StatusOK)
 }
 
