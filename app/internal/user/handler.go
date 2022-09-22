@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"strconv"
 )
@@ -50,6 +51,8 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	serverSpan.SetTag("user_id", id)
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
+	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
+	// register time for all operations steps
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
@@ -65,10 +68,13 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	// call user service to get requested user from cache, if not found get from storage and place to cache
 	workHash := fmt.Sprintf("getUserByID:%s", id)
 
-	s := h.UserService.getSingleFlightGroup()
-	user, err, _ := s.Do(workHash, func() (interface{}, error) {
+	sflight := h.UserService.getSingleFlightGroup()
+	user, err, shared := sflight.Do(workHash, func() (interface{}, error) {
+		//h.UserService.info(workHash)
+		//h.UserService.info("Call User Service getById")
 		return h.UserService.getByID(id)
 	})
+	h.UserService.info(fmt.Sprintf("Result %s is shared: %t", workHash, shared))
 
 	if err != nil {
 		// after response increment prometheus metrics
@@ -85,6 +91,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
+	defer timer.ObserveDuration()
 	renderJSON(w, &user, http.StatusOK)
 }
 
@@ -94,11 +101,16 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
+	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(nickname))
+	// register time for all operations steps
+
 	// call user service to get requested user from cache, if not found get from storage and place to cache
 	workHash := fmt.Sprintf("getUserByNickname:%s", nickname)
 
-	s := h.UserService.getSingleFlightGroup()
-	user, err, _ := s.Do(workHash, func() (interface{}, error) {
+	sflight := h.UserService.getSingleFlightGroup()
+	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		//h.UserService.info(workHash)
+		//h.UserService.info("Call User Service getUserByNickname")
 		return h.UserService.findByNickname(nickname)
 	})
 
@@ -117,6 +129,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
+	defer timer.ObserveDuration()
 	renderJSON(w, &user, http.StatusOK)
 }
 

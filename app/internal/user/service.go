@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	"github.com/opentracing/opentracing-go"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
 	"time"
@@ -27,7 +26,7 @@ type Service interface {
 	getTracer() (t opentracing.Tracer)
 	getSingleFlightGroup() (sfg *singleflight.Group)
 	error(err error)
-	info(err error)
+	info(msg string)
 }
 
 func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer opentracing.Tracer) (Service, error) {
@@ -42,10 +41,6 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 
 func (s service) getByID(id string) (u User, err error) {
 	var cstatus string
-	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	defer timer.ObserveDuration()
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus)()
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
@@ -80,10 +75,6 @@ func (s service) getByID(id string) (u User, err error) {
 
 func (s service) findByNickname(nickname string) (u User, err error) {
 	var cstatus string
-	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(nickname))
-	// register time for all operations steps
-	defer timer.ObserveDuration()
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, nickname, &cstatus)()
 	u, err = s.cache.Get(context.Background(), nickname)
 	if err == nil {
@@ -117,8 +108,8 @@ func (s service) error(err error) {
 	s.logger.Error(err.Error())
 }
 
-func (s service) info(err error) {
-	s.logger.Info(err.Error())
+func (s service) info(msg string) {
+	s.logger.Info(msg)
 }
 
 func (s service) getTracer() (t opentracing.Tracer) {
