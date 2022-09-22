@@ -58,6 +58,8 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 
 		// after response increment prometheus metrics
 		defer func() {
+			serverSpan.Finish()
+			getUserRequestsTotal.Inc()
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 			timer.ObserveDuration()
@@ -82,6 +84,8 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		h.UserService.error(err)
 		// after response increment prometheus metrics
 		defer func() {
+			serverSpan.Finish()
+			getUserRequestsTotal.Inc()
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 			timer.ObserveDuration()
@@ -123,6 +127,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 
 		// after response increment prometheus metrics
 		defer func() {
+			getUserRequestsTotal.Inc()
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 			timer.ObserveDuration()

@@ -2,9 +2,11 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"redis/internal/user"
 	"redis/pkg/logging"
+	"time"
 
 	"github.com/jackc/pgx/v4/log/zapadapter"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -13,7 +15,8 @@ import (
 var _ user.Storage = &db{}
 
 type db struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	logger *logging.Logger
 }
 
 func NewStorage(appLogger *logging.Logger) (*db, error) {
@@ -31,7 +34,8 @@ func NewStorage(appLogger *logging.Logger) (*db, error) {
 	}
 
 	return &db{
-		pool: pool,
+		pool:   pool,
+		logger: appLogger,
 	}, nil
 }
 
@@ -40,6 +44,7 @@ func (p *db) Close() {
 }
 
 func (p *db) GetByID(id string) (u user.User, err error) {
+	defer trace(*p.logger, id)()
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE id = $1`
 
 	var res user.User
@@ -111,4 +116,13 @@ func (p *db) GetAll() (users []user.User, err error) {
 
 func (p *db) PingPool(ctx context.Context) error {
 	return p.pool.Ping(ctx)
+}
+
+func trace(l logging.Logger, id string) func() {
+	start := time.Now()
+	return func() {
+		t := time.Since(start)
+		msg := fmt.Sprintf("Time for get user by id=%s from Database operation: %s", id, t)
+		l.Info(msg, l.Duration("time_duration", t))
+	}
 }
