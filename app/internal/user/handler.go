@@ -51,6 +51,8 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
 	// register time for all operations steps
 
+	userIDSpan := tracer.StartSpan("convert-id-to-int", ext.RPCServerOption(spanCtx))
+
 	if _, err := strconv.Atoi(id); err != nil {
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
@@ -63,18 +65,21 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 			timer.ObserveDuration()
+			userIDSpan.Finish()
 		}()
 		return
 	}
+	userIDSpan.Finish()
 
 	// call user service to get requested user from cache, if not found get from storage and place to cache
+	userGetSpan := tracer.StartSpan("singleflight-call-storage", ext.RPCServerOption(spanCtx))
 	workHash := fmt.Sprintf("getUserByID:%s", id)
 
 	sflight := h.UserService.getSingleFlightGroup()
 	user, err, shared := sflight.Do(workHash, func() (interface{}, error) {
 		//h.UserService.info(workHash)
 		//h.UserService.info("Call User Service getById")
-		return h.UserService.getByID(id)
+		return h.UserService.getByID(id, spanCtx)
 	})
 	h.UserService.info(fmt.Sprintf("Result %s is shared: %t", workHash, shared))
 
@@ -89,9 +94,12 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 			timer.ObserveDuration()
+			userGetSpan.Finish()
 		}()
 		return
 	}
+	userGetSpan.Finish()
+
 	// after response increment prometheus metrics
 	defer func() {
 		serverSpan.Finish()

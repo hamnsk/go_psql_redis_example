@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
 )
@@ -20,7 +21,7 @@ type service struct {
 }
 
 type Service interface {
-	getByID(id string) (u User, err error)
+	getByID(id string, spanCtx opentracing.SpanContext) (u User, err error)
 	findByNickname(nickname string) (u User, err error)
 	getTracer() (t opentracing.Tracer)
 	getSingleFlightGroup() (sfg *singleflight.Group)
@@ -38,37 +39,51 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 	}, nil
 }
 
-func (s service) getByID(id string) (u User, err error) {
+func (s service) getByID(id string, spanCtx opentracing.SpanContext) (u User, err error) {
+	getByIDSpan := s.tracer.StartSpan("get-by-id-service-call", ext.RPCServerOption(spanCtx))
+	defer getByIDSpan.Finish()
 	var cstatus string
 	defer trace(s.logger, id, &cstatus)()
+	getFromCacheSpan := s.tracer.StartSpan("get-user-from-cache", ext.RPCServerOption(spanCtx))
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
 		defer func() {
+			invalidateCacheSpan := s.tracer.StartSpan("invalidate-cache", ext.RPCServerOption(spanCtx))
 			err := s.cache.Expire(context.Background(), id)
 			if err != nil {
 				s.logger.Error("Set cache expiration failed for user id: " + id)
 				s.error(err)
 			}
+			invalidateCacheSpan.Finish()
 		}()
+		getFromCacheSpan.Finish()
 		return u, nil
 	}
+
+	getFromCacheSpan.Finish()
+
 	cstatus = "MISS"
 	s.logger.Debug("Cache miss for user id: " + id)
+	getFromStorageSpan := s.tracer.StartSpan("get-user-from-storage", ext.RPCServerOption(spanCtx))
 	u, err = s.storage.GetByID(id)
 	if err != nil {
+		getFromStorageSpan.Finish()
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
+		setToCacheSpan := s.tracer.StartSpan("set-user-to-cache", ext.RPCServerOption(spanCtx))
 		err = s.cache.Set(context.Background(), u)
 		if err != nil {
 			s.logger.Error(err.Error())
 		}
 		s.logger.Debug("Write to cache user by id: " + id)
+		setToCacheSpan.Finish()
 	}()
+	getFromStorageSpan.Finish()
 	return u, nil
 }
 
