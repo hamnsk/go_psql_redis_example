@@ -7,7 +7,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
-	"time"
 )
 
 var _ Service = &service{}
@@ -104,7 +103,8 @@ func (s service) findByNickname(nickname string) (u User, err error) {
 
 func (s service) error(err error) {
 	sentry.CaptureException(err)
-	sentry.Flush(time.Second * 1)
+	// TODO: disable flush migrate to syncHTTPTransport https://docs.sentry.io/platforms/go/guides/http/configuration/transports/
+	//sentry.Flush(time.Second * 1)
 	s.logger.Error(err.Error())
 }
 
