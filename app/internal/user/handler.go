@@ -55,7 +55,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := strconv.Atoi(id); err != nil {
 		//render result to client
-		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
+		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing, you trace id: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
 
 		// after response increment prometheus metrics
@@ -76,16 +76,16 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	workHash := fmt.Sprintf("getUserByID:%s", id)
 
 	sflight := h.UserService.getSingleFlightGroup()
-	user, err, shared := sflight.Do(workHash, func() (interface{}, error) {
+	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
 		//h.UserService.info(workHash)
 		//h.UserService.info("Call User Service getById")
-		return h.UserService.getByID(id, spanCtx)
+		return h.UserService.getByID(id, spanCtx, r.Header.Get("Uber-Trace-Id"))
 	})
-	h.UserService.info(fmt.Sprintf("Result %s is shared: %t", workHash, shared))
+	//h.UserService.info(fmt.Sprintf("Result %s is shared: %t", workHash, shared))
 
 	if err != nil {
 		//render result to client
-		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
+		renderJSON(w, &AppError{fmt.Sprintf("not found, you trace id: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusNotFound)
 		h.UserService.error(err)
 		// after response increment prometheus metrics
 		defer func() {
@@ -112,9 +112,18 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
+	tracer := h.UserService.getTracer()
+	spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
+	serverSpan := tracer.StartSpan("get-user-by-nickname", ext.RPCServerOption(spanCtx))
+	serverSpan.SetTag("request_uri", r.RequestURI)
+	serverSpan.SetTag("request_body", r.Body)
+	serverSpan.SetTag("request_header", r.Header)
+	serverSpan.SetTag("request_method", r.Method)
+	serverSpan.SetTag("request_content_length", r.ContentLength)
+	serverSpan.SetTag("trace_id", r.Header.Get("Uber-Trace-Id"))
 	w.Header().Set("Content-Type", "application/json")
 	nickname := r.FormValue("nickname")
-
+	serverSpan.SetTag("nickname", nickname)
 	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(nickname))
 	// register time for all operations steps
 
@@ -125,7 +134,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
 		//h.UserService.info(workHash)
 		//h.UserService.info("Call User Service getUserByNickname")
-		return h.UserService.findByNickname(nickname)
+		return h.UserService.findByNickname(nickname, spanCtx, r.Header.Get("Uber-Trace-Id"))
 	})
 
 	if err != nil {
@@ -135,6 +144,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 
 		// after response increment prometheus metrics
 		defer func() {
+			serverSpan.Finish()
 			getUserRequestsTotal.Inc()
 			getUserRequestsError.Inc()
 			httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
@@ -146,6 +156,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 
 	// after response increment prometheus metrics
 	defer func() {
+		serverSpan.Finish()
 		getUserRequestsTotal.Inc()
 		getUserRequestsSuccess.Inc()
 		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
