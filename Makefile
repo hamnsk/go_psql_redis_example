@@ -81,10 +81,10 @@ bench-install:
 
 stress:
 	echo "begin stress"; \
-	/tmp/bin/gobench -u http://localhost:8080/user/1245 -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/4567 -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/hdfgfgh -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/647564 -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.109/user/1245 -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.109/user/4567 -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.109/user/hdfgfgh -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.109/user/647564 -k=true -c 100 -t 2 & \
 	wait; \
 	echo "done"
 

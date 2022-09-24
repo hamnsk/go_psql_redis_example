@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"strconv"
 )
@@ -35,9 +37,10 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	tracer := h.UserService.getTracer()
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(r.Header))
 	tr := tracer.Tracer("get-user-by-id-handler")
 	_, span := tr.Start(ctx, "get-user")
 
@@ -47,6 +50,12 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	span.SetAttributes(attribute.Key("request_method").String(r.Method))
 	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
 	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+	span.SetAttributes(attribute.Key("trace_id").String(r.Header.Get("Uber-Trace-Id")))
+	//span.SetAttributes(attribute.Key("nginx.trace_id").String(r.Header.Get("Uber-Trace-Id")))
+
+	for k, v := range r.Header {
+		span.SetAttributes(attribute.Key(k).StringSlice(v))
+	}
 
 	defer span.End()
 	w.Header().Set("Content-Type", "application/json")
