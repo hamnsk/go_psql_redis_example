@@ -54,6 +54,9 @@ initdb:
 build: clean deps
 	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
 
+dbuild: clean deps
+	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
+
 run: clean clean-docker deps postgres redis initdb jaeger
 	cd ${CURRENT_DIR}/app && \
 	DATABASE_URL=postgres://rexamp:password@localhost:5432/redisexamp?sslmode=disable \

@@ -8,6 +8,7 @@ import (
 	"github.com/heptiolabs/healthcheck"
 	"github.com/pkg/profile"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"os"
 	"os/signal"
@@ -39,6 +40,12 @@ func main() {
 	err, tracer := tracing.InitTracing(&logger)
 
 	otel.SetTracerProvider(tracer)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
 
 	if err != nil {
 		fatalServer(err, logger)

@@ -1,14 +1,10 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	otrace "go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
@@ -39,20 +35,26 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
+	//ctx, cancel := context.WithCancel(r.Context())
+	//defer cancel()
 	tracer := h.UserService.getTracer()
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(r.Header))
+	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	//otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(r.Header))
+	//propgator := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+	//carrier := propagation.MapCarrier{}
+	//propgator.Inject(ctx, carrier)
+	//parentCtx := propgator.Extract(context.Background(), carrier)
+
 	tr := tracer.Tracer("get-user-by-id-handler")
 
 	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("nginx-red", "/user", r)...),
+		//otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		//otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		//otrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("nginx-red", "/user", r)...),
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
 
-	_, span := tr.Start(ctx, "get-user", opts...)
+	_, span := tr.Start(r.Context(), "get-user", opts...)
 
 	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
 	//span.SetAttributes(attribute.Key("request_body").String(r.Body))

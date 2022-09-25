@@ -34,14 +34,14 @@ func InitTracing(l *logging.Logger) (error, *tracesdk.TracerProvider) {
 func tracerProvider(url, service, environment string, id int64) (*tracesdk.TracerProvider, error) {
 	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
-	//bsp := tracesdk.NewBatchSpanProcessor(exp)
+	bsp := tracesdk.NewBatchSpanProcessor(exp)
 	if err != nil {
 		return nil, err
 	}
 	tp := tracesdk.NewTracerProvider(
 		tracesdk.WithSampler(tracesdk.AlwaysSample()),
-		tracesdk.WithBatcher(exp),
-		//tracesdk.WithSpanProcessor(bsp),
+		//tracesdk.WithBatcher(exp),
+		tracesdk.WithSpanProcessor(bsp),
 		tracesdk.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(service),
