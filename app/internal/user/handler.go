@@ -8,6 +8,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	otrace "go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
 )
@@ -42,7 +44,15 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	tracer := h.UserService.getTracer()
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(r.Header))
 	tr := tracer.Tracer("get-user-by-id-handler")
-	_, span := tr.Start(ctx, "get-user")
+
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("nginx-red", "/user", r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+
+	_, span := tr.Start(ctx, "get-user", opts...)
 
 	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
 	//span.SetAttributes(attribute.Key("request_body").String(r.Body))
