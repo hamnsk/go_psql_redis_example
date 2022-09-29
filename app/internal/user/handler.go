@@ -1,13 +1,16 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	otrace "go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -35,26 +38,33 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
-	//ctx, cancel := context.WithCancel(r.Context())
-	//defer cancel()
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	tracer := h.UserService.getTracer()
-	//otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	//otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(r.Header))
-	//propgator := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
-	//carrier := propagation.MapCarrier{}
-	//propgator.Inject(ctx, carrier)
-	//parentCtx := propgator.Extract(context.Background(), carrier)
+
+	traceHeaders := strings.Split(r.Header.Get("Traceparent"), "-")
+	si, _ := otrace.SpanIDFromHex(traceHeaders[2])
+	ti, _ := otrace.TraceIDFromHex(traceHeaders[1])
+
+	var spanContextConfig otrace.SpanContextConfig
+	spanContextConfig.TraceID = ti
+	spanContextConfig.SpanID = si
+	spanContextConfig.TraceFlags = 01
+	spanContextConfig.Remote = false
+	spanContext := otrace.NewSpanContext(spanContextConfig)
 
 	tr := tracer.Tracer("get-user-by-id-handler")
 
 	opts := []otrace.SpanStartOption{
-		//otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		//otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
 		//otrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("nginx-red", "/user", r)...),
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
 
-	_, span := tr.Start(r.Context(), "get-user", opts...)
+	parentCtx, span := tr.Start(reqCtx, "get-user", opts...)
 
 	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
 	//span.SetAttributes(attribute.Key("request_body").String(r.Body))
@@ -76,6 +86,8 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
+	_, convertAtoiSpan := tr.Start(parentCtx, "convert-string-to-int", opts...)
+
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
 		defer getUserRequestsError.Inc()
@@ -85,9 +97,10 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
 		span.SetStatus(http.StatusTeapot, "Hello from teapot")
+		convertAtoiSpan.End()
 		return
 	}
-
+	convertAtoiSpan.End()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
 	user, err := h.UserService.getByID(id)
 

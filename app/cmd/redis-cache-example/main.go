@@ -39,13 +39,8 @@ func main() {
 
 	err, tracer := tracing.InitTracing(&logger)
 
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	otel.SetTracerProvider(tracer)
-	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{},
-			propagation.Baggage{},
-		),
-	)
 
 	if err != nil {
 		fatalServer(err, logger)
