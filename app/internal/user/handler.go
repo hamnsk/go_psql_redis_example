@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	otrace "go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -43,16 +43,16 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	tracer := h.UserService.getTracer()
 
-	traceHeaders := strings.Split(r.Header.Get("Traceparent"), "-")
-	si, _ := otrace.SpanIDFromHex(traceHeaders[2])
-	ti, _ := otrace.TraceIDFromHex(traceHeaders[1])
-
-	var spanContextConfig otrace.SpanContextConfig
-	spanContextConfig.TraceID = ti
-	spanContextConfig.SpanID = si
-	spanContextConfig.TraceFlags = 01
-	spanContextConfig.Remote = false
-	spanContext := otrace.NewSpanContext(spanContextConfig)
+	//traceHeaders := strings.Split(r.Header.Get("Traceparent"), "-")
+	//si, _ := otrace.SpanIDFromHex(traceHeaders[2])
+	//ti, _ := otrace.TraceIDFromHex(traceHeaders[1])
+	//
+	//var spanContextConfig otrace.SpanContextConfig
+	//spanContextConfig.TraceID = ti
+	//spanContextConfig.SpanID = si
+	//spanContextConfig.TraceFlags = 01
+	//spanContextConfig.Remote = false
+	//spanContext := otrace.NewSpanContext(spanContextConfig)
 
 	tr := tracer.Tracer("get-user-by-id-handler")
 
@@ -62,6 +62,7 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		//otrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("nginx-red", "/user", r)...),
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
 	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
 
 	parentCtx, span := tr.Start(reqCtx, "get-user", opts...)

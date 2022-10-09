@@ -80,14 +80,14 @@ check-ready:
 
 bench-install:
 	GOPATH=/tmp/ go get github.com/valyala/fasthttp
-	GOPATH=/tmp/ go get github.com/cmpxchg16/gobench
+	GOPATH=/tmp/ go install github.com/cmpxchg16/gobench@latest
 
 stress:
 	echo "begin stress"; \
-	/tmp/bin/gobench -u http://192.168.1.109/user/1245 -k=true -c 100 -t 2 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/4567 -k=true -c 100 -t 2 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/hdfgfgh -k=true -c 100 -t 2 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/647564 -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.110/user/1245 -k=true -c 100 -t 60 & \
+	/tmp/bin/gobench -u http://192.168.1.110/user/4567 -k=true -c 100 -t 60 & \
+	/tmp/bin/gobench -u http://192.168.1.110/user/hdfgfgh -k=true -c 100 -t 60 & \
+	/tmp/bin/gobench -u http://192.168.1.110/user/647564 -k=true -c 100 -t 60 & \
 	wait; \
 	echo "done"
 
