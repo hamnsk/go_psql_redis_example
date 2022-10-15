@@ -17,20 +17,20 @@ type service struct {
 	storage Storage
 	cache   Cache
 	logger  logging.Logger
-	tracer  tracesdk.TracerProvider
+	tracer  *tracesdk.TracerProvider
 	sflight *singleflight.Group
 }
 
 type Service interface {
 	getByID(id string, ctx context.Context) (u User, err error)
 	findByNickname(nickname string, ctx context.Context) (u User, err error)
-	getTracer() (t tracesdk.TracerProvider)
+	getTracer() (t *tracesdk.TracerProvider)
 	getSingleFlightGroup() (sfg *singleflight.Group)
 	error(err error)
 	info(msg string)
 }
 
-func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer tracesdk.TracerProvider) (Service, error) {
+func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer *tracesdk.TracerProvider) (Service, error) {
 	return &service{
 		storage: userStorage,
 		cache:   userCache,
@@ -167,7 +167,7 @@ func (s service) info(msg string) {
 	s.logger.Info(msg)
 }
 
-func (s service) getTracer() (t tracesdk.TracerProvider) {
+func (s service) getTracer() (t *tracesdk.TracerProvider) {
 	return s.tracer
 }
 
