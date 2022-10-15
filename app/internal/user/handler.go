@@ -1,7 +1,6 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -39,8 +38,7 @@ func (h *userHandler) Register(router *mux.Router) {
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
+	ctx := r.Context()
 	tracer := h.UserService.getTracer()
 
 	//traceHeaders := strings.Split(r.Header.Get("Traceparent"), "-")
@@ -76,24 +74,23 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	span.SetAttributes(attribute.Key("trace_id").String(r.Header.Get("Uber-Trace-Id")))
 	//span.SetAttributes(attribute.Key("nginx.trace_id").String(r.Header.Get("Uber-Trace-Id")))
 
-	for k, v := range r.Header {
-		span.SetAttributes(attribute.Key(k).StringSlice(v))
-	}
+	//for k, v := range r.Header {
+	//	span.SetAttributes(attribute.Key(k).StringSlice(v))
+	//}
 
-	defer span.End()
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
-	defer getUserRequestsTotal.Inc()
+	getUserRequestsTotal.Inc()
 
 	_, convertAtoiSpan := tr.Start(parentCtx, "convert-string-to-int", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
+		getUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
@@ -107,9 +104,9 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
+		getUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
@@ -117,12 +114,13 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
+	getUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
 	renderJSON(w, &user, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
+	span.End()
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {

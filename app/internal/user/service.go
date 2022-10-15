@@ -47,7 +47,7 @@ func (s service) getByID(id string) (u User, err error) {
 	// register time for all operations steps
 	defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, id, &cstatus)()
+	//defer trace(s.logger, id, &cstatus)()
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
@@ -60,6 +60,8 @@ func (s service) getByID(id string) (u User, err error) {
 				s.error(err)
 			}
 		}()
+		msg := fmt.Sprintf("[%s] Time for get user by id=%s", cstatus, id)
+		s.logger.Info(msg, s.logger.String("cache_status", cstatus))
 		return u, nil
 	}
 	cstatus = "MISS"
@@ -72,6 +74,8 @@ func (s service) getByID(id string) (u User, err error) {
 	defer func() {
 		_ = s.cache.Set(context.Background(), u)
 	}()
+	msg := fmt.Sprintf("[%s] Time for get user by id=%s", cstatus, id)
+	s.logger.Info(msg, s.logger.String("cache_status", cstatus))
 	return u, nil
 }
 
@@ -107,6 +111,7 @@ func (s service) findByNickname(nickname string) (u User, err error) {
 	defer func() {
 		_ = s.cache.SetByNickname(context.Background(), u)
 	}()
+
 	return u, nil
 }
 
