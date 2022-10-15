@@ -1,11 +1,15 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	otrace "go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
 )
@@ -35,21 +39,36 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
 	tracer := h.UserService.getTracer()
-	spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
-	serverSpan := tracer.StartSpan("get-user-by-id", ext.RPCServerOption(spanCtx))
-	serverSpan.SetTag("request_uri", r.RequestURI)
-	serverSpan.SetTag("request_body", r.Body)
-	serverSpan.SetTag("request_header", r.Header)
-	serverSpan.SetTag("request_method", r.Method)
-	serverSpan.SetTag("request_content_length", r.ContentLength)
-	serverSpan.SetTag("trace_id", r.Header.Get("Uber-Trace-Id"))
-	defer serverSpan.Finish()
+	tr := tracer.Tracer("Handler.getUserById")
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+
+	parentCtx, span := tr.Start(reqCtx, "GetUser", opts...)
+	defer span.End()
+
+	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
+	span.SetAttributes(attribute.Key("request_method").String(r.Method))
+	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
+	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+
 	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
-	serverSpan.SetTag("user_id", id)
+	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
+	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
+
+	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
@@ -59,11 +78,21 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
+		span.SetStatus(http.StatusTeapot, "Hello from teapot")
+		convertAtoiSpan.End()
 		return
 	}
+	convertAtoiSpan.End()
 
+	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	workHash := fmt.Sprintf("getUserByID:%s", id)
+	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err := h.UserService.getByID(id)
+	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		return h.UserService.getByID(id, callUserServiceCtx)
+	})
+
+	//user, err := h.UserService.getByID(id, callUserServiceCtx)
 
 	if err != nil {
 		// after response increment prometheus metrics
@@ -73,25 +102,60 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
+		span.SetStatus(http.StatusNotFound, "Not found user by id")
+		userServiceCallSpan.End()
 		return
 	}
+	userServiceCallSpan.End()
+
 	// after response increment prometheus metrics
 	defer getUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
 	renderJSON(w, &user, http.StatusOK)
+	span.SetStatus(http.StatusOK, "All ok!")
+	defer timer.ObserveDuration()
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	tracer := h.UserService.getTracer()
+	tr := tracer.Tracer("Handler.getUserById")
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+
+	_, span := tr.Start(reqCtx, "GetUser", opts...)
+
+	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
+	span.SetAttributes(attribute.Key("request_method").String(r.Method))
+	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
+	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+
+	defer span.End()
+
 	w.Header().Set("Content-Type", "application/json")
 	nickname := r.FormValue("nickname")
 	fmt.Println(nickname)
+	span.SetAttributes(attribute.Key("user_nickname").String(nickname))
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
 
 	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err := h.UserService.findByNickname(nickname)
+	workHash := fmt.Sprintf("getUserByNickname:%s", nickname)
+
+	sflight := h.UserService.getSingleFlightGroup()
+	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		return h.UserService.findByNickname(nickname, reqCtx)
+	})
 
 	if err != nil {
 		// after response increment prometheus metrics

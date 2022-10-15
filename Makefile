@@ -41,6 +41,7 @@ jaeger:
 	docker run \
 	  -d \
 	  -p 6831:6831/udp \
+	  -p 14268:14268 \
 	  -p 16686:16686 \
 	  --name rjaeger \
 	  jaegertracing/all-in-one:latest
@@ -52,6 +53,9 @@ initdb:
 
 build: clean deps
 	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
+
+dbuild: clean deps
+	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
 
 run: clean clean-docker deps postgres redis initdb jaeger
 	cd ${CURRENT_DIR}/app && \
@@ -76,14 +80,14 @@ check-ready:
 
 bench-install:
 	GOPATH=/tmp/ go get github.com/valyala/fasthttp
-	GOPATH=/tmp/ go get github.com/cmpxchg16/gobench
+	GOPATH=/tmp/ go install github.com/cmpxchg16/gobench@latest
 
 stress:
 	echo "begin stress"; \
-	/tmp/bin/gobench -u http://localhost:8080/user/1245 -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/4567 -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/hdfgfgh -k=true -c 100 -t 360 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/647564 -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.110/user/1245 -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/4567 -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/hdfgfgh -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/647564 -k=true -c 100 -t 360 & \
 	wait; \
 	echo "done"
 
