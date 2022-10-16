@@ -7,30 +7,41 @@ import (
 	"github.com/go-redis/redis/v9"
 	"os"
 	"redis/internal/user"
+	"redis/pkg/logging"
 	"strconv"
 	"time"
 )
 
 var _ user.Cache = &cache{}
 
+const KeepAlivePollPeriod = 3
+
 type cache struct {
 	client *redis.Client
+	logger *logging.Logger
 }
 
-func New() (*cache, error) {
-	client := redis.NewClient(&redis.Options{
+func dial() *redis.Client {
+	return redis.NewClient(&redis.Options{
 		Addr:        os.Getenv("REDIS"),
 		DB:          0,
 		DialTimeout: 100 * time.Millisecond,
 		ReadTimeout: 100 * time.Millisecond,
 	})
+}
 
+func New(appLogger *logging.Logger) (*cache, error) {
+	client := dial()
 	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, err
+		return &cache{
+			client: nil,
+			logger: appLogger,
+		}, err
 	}
 
 	return &cache{
 		client: client,
+		logger: appLogger,
 	}, nil
 }
 
@@ -83,4 +94,25 @@ func (c *cache) PingClient(ctx context.Context) error {
 
 func (c *cache) Close() error {
 	return c.client.Close()
+}
+
+func (c *cache) KeepAlive() {
+	var err error
+	for {
+		time.Sleep(time.Second * KeepAlivePollPeriod)
+		lostConnect := false
+		if c.client == nil {
+			lostConnect = true
+		} else if err = c.PingClient(context.Background()); err != nil {
+			lostConnect = true
+		}
+		if !lostConnect {
+			continue
+		}
+		c.logger.Info("Reconnect to Redis...")
+		c.client = dial()
+		if c.client == nil {
+			continue
+		}
+	}
 }

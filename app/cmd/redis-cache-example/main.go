@@ -43,7 +43,7 @@ func main() {
 	otel.SetTracerProvider(tracer)
 
 	if err != nil {
-		fatalServer(err, logger)
+		logger.Error(err.Error())
 	}
 
 	router := mux.NewRouter()
@@ -52,15 +52,18 @@ func main() {
 	logger.Info("Application storage initialized.")
 
 	if err != nil {
-		fatalServer(err, logger)
+		logger.Error(err.Error())
 	}
 
-	userCache, err := cache.New()
+	go userStorage.KeepAlive()
+
+	userCache, err := cache.New(&logger)
 	logger.Info("Application cache initialized.")
 
 	if err != nil {
-		fatalServer(err, logger)
+		logger.Error(err.Error())
 	}
+	go userCache.KeepAlive()
 
 	userService, err := user.NewService(userStorage, userCache, logger, tracer)
 	logger.Info("Application service initialized.")
