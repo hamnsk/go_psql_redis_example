@@ -7,6 +7,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/heptiolabs/healthcheck"
 	"github.com/pkg/profile"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"os"
 	"os/signal"
@@ -35,22 +37,24 @@ func main() {
 		logger.Fatal("Init Sentry failed: " + err.Error())
 	}
 
-	err, tracer, tCloser := tracing.InitTracing(&logger)
+	err, tracer := tracing.InitTracing(&logger)
 	logger.Info("Application tracer initialized.")
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	otel.SetTracerProvider(tracer)
 
 	if err != nil {
 		fatalServer(err, logger)
-	} else {
-		defer tCloser.Close()
 	}
 
 	router := mux.NewRouter()
 	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
 	userStorage, err := psql.NewStorage(&logger)
 	logger.Info("Application storage initialized.")
+
 	if err != nil {
 		fatalServer(err, logger)
 	}
+
 	userCache, err := cache.New()
 	logger.Info("Application cache initialized.")
 

@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/getsentry/sentry-go"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
+	"github.com/prometheus/client_golang/prometheus"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	otrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
 )
@@ -16,20 +17,20 @@ type service struct {
 	storage Storage
 	cache   Cache
 	logger  logging.Logger
-	tracer  opentracing.Tracer
+	tracer  *tracesdk.TracerProvider
 	sflight *singleflight.Group
 }
 
 type Service interface {
-	getByID(id string, spanCtx opentracing.SpanContext, traceId string) (u User, err error)
-	findByNickname(nickname string, spanCtx opentracing.SpanContext, traceId string) (u User, err error)
-	getTracer() (t opentracing.Tracer)
+	getByID(id string, ctx context.Context) (u User, err error)
+	findByNickname(nickname string, ctx context.Context) (u User, err error)
+	getTracer() (t *tracesdk.TracerProvider)
 	getSingleFlightGroup() (sfg *singleflight.Group)
 	error(err error)
 	info(msg string)
 }
 
-func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer opentracing.Tracer) (Service, error) {
+func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer *tracesdk.TracerProvider) (Service, error) {
 	return &service{
 		storage: userStorage,
 		cache:   userCache,
@@ -39,83 +40,119 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 	}, nil
 }
 
-func (s service) getByID(id string, spanCtx opentracing.SpanContext, traceId string) (u User, err error) {
-	getByIDSpan := s.tracer.StartSpan("get-by-id-service-call", ext.RPCServerOption(spanCtx))
-	defer getByIDSpan.Finish()
+func (s service) getByID(id string, ctx context.Context) (u User, err error) {
+	opts := []otrace.SpanStartOption{
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+
+	tr := s.tracer.Tracer("Service.getById")
+	parentCtx, span := tr.Start(ctx, "GetUserById", opts...)
+	defer span.End()
 	var cstatus string
+
+	traceId := span.SpanContext().TraceID().String()
+
+	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
+	// register time for all operations steps
+	defer timer.ObserveDuration()
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus, traceId)()
-	getFromCacheSpan := s.tracer.StartSpan("get-user-from-cache", ext.RPCServerOption(spanCtx))
+	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
-		s.logger.Debug(fmt.Sprintf("Cache hit for user id: %s with trace_id=%s", id, traceId))
+		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
 		defer func() {
-			invalidateCacheSpan := s.tracer.StartSpan("invalidate-cache", ext.RPCServerOption(spanCtx))
+			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
+
 			err := s.cache.Expire(context.Background(), id)
 			if err != nil {
-				s.logger.Error(fmt.Sprintf("Set cache expiration failed for user id: %s with trace_id=%s ", id, traceId))
+				s.logger.Error("Set cache expiration failed for user id: " + id)
 				s.error(err)
+				setExpireInCache.End()
 			}
-			invalidateCacheSpan.Finish()
+			setExpireInCache.End()
 		}()
-		getFromCacheSpan.Finish()
+		getFromCacheSpan.End()
 		return u, nil
 	}
-
-	getFromCacheSpan.Finish()
+	getFromCacheSpan.End()
 
 	cstatus = "MISS"
-	s.logger.Debug(fmt.Sprintf("Cache miss for user id: %s with trace_id=%s", id, traceId))
-	getFromStorageSpan := s.tracer.StartSpan("get-user-from-storage", ext.RPCServerOption(spanCtx))
+	s.logger.Debug("Cache miss for user id: " + id)
+	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
 	u, err = s.storage.GetByID(id)
 	if err != nil {
-		getFromStorageSpan.Finish()
-		return User{}, fmt.Errorf("failed to get user by id=%s with trace_id=%s. error: %w", id, traceId, err)
+		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
-		setToCacheSpan := s.tracer.StartSpan("set-user-to-cache", ext.RPCServerOption(spanCtx))
+		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
 		err = s.cache.Set(context.Background(), u)
 		if err != nil {
 			s.logger.Error(err.Error())
+			setInCacheSpan.End()
 		}
-		s.logger.Debug(fmt.Sprintf("Write to cache user id: %s with trace_id=%s", id, traceId))
-		setToCacheSpan.Finish()
+		s.logger.Debug("Write to cache user by id: " + id)
+		setInCacheSpan.End()
+
 	}()
-	getFromStorageSpan.Finish()
+	getFromDBSpan.End()
+	//msg := fmt.Sprintf("[%s] Time for get user by id=%s with trace_id=%s", cstatus, id, traceId)
+	//s.logger.Info(msg, s.logger.String("cache_status", cstatus), s.logger.String("traceID", traceId))
 	return u, nil
 }
 
-func (s service) findByNickname(nickname string, spanCtx opentracing.SpanContext, traceId string) (u User, err error) {
-	getByNicknameSpan := s.tracer.StartSpan("get-by-nickname-service-call", ext.RPCServerOption(spanCtx))
+func (s service) findByNickname(nickname string, ctx context.Context) (u User, err error) {
+	opts := []otrace.SpanStartOption{
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+
+	tr := s.tracer.Tracer("Service.findByNickname")
+	parentCtx, span := tr.Start(ctx, "FindUserByNicname", opts...)
+	defer span.End()
+
 	var cstatus string
+	traceId := span.SpanContext().TraceID().String()
+
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, nickname, &cstatus, traceId)()
+	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
+	defer getFromCacheSpan.End()
 	u, err = s.cache.Get(context.Background(), nickname)
 	if err == nil {
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
 		defer func() {
+			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
+			defer setExpireInCache.End()
 			err := s.cache.Expire(context.Background(), nickname)
 			if err != nil {
-				s.logger.Error("Set cache expiration failed for user id: " + nickname)
+				s.logger.Error("Set cache expiration failed for user nickname: " + nickname)
 				s.error(err)
 			}
-			getByNicknameSpan.Finish()
 		}()
 		return u, nil
 	}
 	cstatus = "MISS"
-	s.logger.Debug("Cache miss for user id: " + nickname)
+	s.logger.Debug("Cache miss for user nickname: " + nickname)
+	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
+	defer getFromDBSpan.End()
 	u, err = s.storage.FindOneByNickName(nickname)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", nickname, err)
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
-		_ = s.cache.SetByNickname(context.Background(), u)
+		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+		defer setInCacheSpan.End()
+		err = s.cache.SetByNickname(context.Background(), u)
+		if err != nil {
+			s.logger.Error(err.Error())
+		}
+		s.logger.Debug("Write to cache user by nickname: " + nickname)
 	}()
-	getByNicknameSpan.Finish()
 	return u, nil
 }
 
@@ -130,7 +167,7 @@ func (s service) info(msg string) {
 	s.logger.Info(msg)
 }
 
-func (s service) getTracer() (t opentracing.Tracer) {
+func (s service) getTracer() (t *tracesdk.TracerProvider) {
 	return s.tracer
 }
 

@@ -41,6 +41,7 @@ jaeger:
 	docker run \
 	  -d \
 	  -p 6831:6831/udp \
+	  -p 14268:14268 \
 	  -p 16686:16686 \
 	  --name rjaeger \
 	  jaegertracing/all-in-one:latest
@@ -79,7 +80,7 @@ check-ready:
 
 bench-install:
 	GOPATH=/tmp/ go get github.com/valyala/fasthttp
-	GOPATH=/tmp/ go get github.com/cmpxchg16/gobench
+	GOPATH=/tmp/ go install github.com/cmpxchg16/gobench@latest
 
 
 str:
@@ -90,12 +91,11 @@ str:
 
 stress:
 	echo "begin stress"; \
-	/tmp/bin/gobench -u http://localhost:8080/user/1245 -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/4567 -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/hdfgfgh -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://localhost:8080/user/647564 -k=true -c 100 -t 60 & \
-	wait; \
-	echo "done"
+	/tmp/bin/gobench -u http://192.168.1.110/user/1245 -k=true -c 100 -t 2 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/4567 -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/hdfgfgh -k=true -c 100 -t 360 & \
+	/tmp/bin/gobench -u http://192.168.1.110//user/647564 -k=true -c 100 -t 360 & \
+
 
 stress-1:
 	echo "begin stress"; \
