@@ -11,4 +11,5 @@ type Cache interface {
 	Expire(ctx context.Context, id string) error
 	PingClient(ctx context.Context) error
 	Close() error
+	KeepAlive()
 }

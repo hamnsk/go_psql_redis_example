@@ -26,7 +26,11 @@ func NewStorage(appLogger *logging.Logger) (*db, error) {
 	config := initConfig(appLogger)
 	pool, err := dial(context.Background(), config)
 	if err != nil {
-		return nil, err
+		return &db{
+			pool:   nil,
+			logger: appLogger,
+			config: config,
+		}, err
 	}
 	return &db{
 		pool:   pool,
@@ -46,7 +50,7 @@ func initConfig(appLogger *logging.Logger) *pgxpool.Config {
 }
 
 func dial(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
-	return pgxpool.ConnectConfig(context.Background(), config)
+	return pgxpool.ConnectConfig(ctx, config)
 }
 
 func (p *db) Close() {

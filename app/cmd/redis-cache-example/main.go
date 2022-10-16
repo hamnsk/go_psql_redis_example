@@ -57,12 +57,13 @@ func main() {
 
 	go userStorage.KeepAlive()
 
-	userCache, err := cache.New()
+	userCache, err := cache.New(&logger)
 	logger.Info("Application cache initialized.")
 
 	if err != nil {
-		fatalServer(err, logger)
+		logger.Error(err.Error())
 	}
+	go userCache.KeepAlive()
 
 	userService, err := user.NewService(userStorage, userCache, logger, tracer)
 	logger.Info("Application service initialized.")
