@@ -63,6 +63,7 @@ func main() {
 	}
 
 	userService, err := user.NewService(userStorage, userCache, logger, tracer)
+	logger.Info("Application service initialized.")
 
 	if err != nil {
 		fatalServer(err, logger)
