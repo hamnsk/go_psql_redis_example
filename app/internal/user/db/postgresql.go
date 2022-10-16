@@ -14,29 +14,39 @@ import (
 
 var _ user.Storage = &db{}
 
+const KeepAlivePollPeriod = 3
+
 type db struct {
 	pool   *pgxpool.Pool
 	logger *logging.Logger
+	config *pgxpool.Config
 }
 
 func NewStorage(appLogger *logging.Logger) (*db, error) {
-	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	config := initConfig(appLogger)
+	pool, err := dial(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
-
-	config.ConnConfig.Logger = zapadapter.NewLogger(appLogger.Logger)
-	config.ConnConfig.PreferSimpleProtocol = true
-
-	pool, err := pgxpool.ConnectConfig(context.Background(), config)
-	if err != nil {
-		return nil, err
-	}
-
 	return &db{
 		pool:   pool,
 		logger: appLogger,
+		config: config,
 	}, nil
+}
+
+func initConfig(appLogger *logging.Logger) *pgxpool.Config {
+	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil
+	}
+	config.ConnConfig.Logger = zapadapter.NewLogger(appLogger.Logger)
+	config.ConnConfig.PreferSimpleProtocol = true
+	return config
+}
+
+func dial(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
+	return pgxpool.ConnectConfig(context.Background(), config)
 }
 
 func (p *db) Close() {
@@ -116,6 +126,27 @@ func (p *db) GetAll() (users []user.User, err error) {
 
 func (p *db) PingPool(ctx context.Context) error {
 	return p.pool.Ping(ctx)
+}
+
+func (p *db) KeepAlive() {
+	var err error
+	for {
+		time.Sleep(time.Second * KeepAlivePollPeriod)
+		lostConnect := false
+		if p.pool == nil {
+			lostConnect = true
+		} else if err = p.PingPool(context.Background()); err != nil {
+			lostConnect = true
+		}
+		if !lostConnect {
+			continue
+		}
+		p.logger.Info("Reconnect to Postgresql...")
+		p.pool, err = dial(context.Background(), p.config)
+		if err != nil {
+			continue
+		}
+	}
 }
 
 func trace(l logging.Logger, id string) func() {
