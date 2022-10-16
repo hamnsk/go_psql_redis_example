@@ -1,26 +1,63 @@
 global:
   scrape_interval: 10s
   external_labels:
-    monitor: 'karbidsoft-monitoring'
+    monitor: 'docker-compose'
 
 scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['prometheus:9090']
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
 
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
 
   - job_name: 'fluent-bit'
     metrics_path: /api/v1/metrics/prometheus
     static_configs:
       - targets: ['fluent-bit:2020']
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
 
   - job_name: 'go-redis-app'
     static_configs:
       - targets: ['go-redis-app:8081']
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
 
   - job_name: 'pgbouncer'
     static_configs:
       - targets: ['pgbouncer-exporter:9127']
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
+
+  - job_name: 'jaeger_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: [ 'jaeger:14269' ]
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
+  - job_name: 'aggregated-trace-metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: [ 'otelcol:8889' ]
+    relabel_configs:
+      - source_labels: [ '__address__' ]
+        target_label: 'environment'
+        replacement: 'development'
