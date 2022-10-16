@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -66,7 +65,6 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
 	defer getUserRequestsTotal.Inc()
-	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
 
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
@@ -115,7 +113,6 @@ func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
 	//render result to client
 	renderJSON(w, &user, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
-	defer timer.ObserveDuration()
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {

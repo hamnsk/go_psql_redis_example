@@ -34,7 +34,7 @@ func init() {
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.MessageKey = "msg"
+	config.EncoderConfig.MessageKey = "message"
 	lf := os.Getenv("APP_LOG_FILE")
 	if len(lf) > 0 {
 		p, err := os.Getwd()
