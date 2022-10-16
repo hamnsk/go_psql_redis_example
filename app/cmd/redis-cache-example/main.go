@@ -36,6 +36,7 @@ func main() {
 	}
 
 	err, tracer, tCloser := tracing.InitTracing(&logger)
+	logger.Info("Application tracer initialized.")
 
 	if err != nil {
 		fatalServer(err, logger)
@@ -46,16 +47,19 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
 	userStorage, err := psql.NewStorage(&logger)
+	logger.Info("Application storage initialized.")
 	if err != nil {
 		fatalServer(err, logger)
 	}
 	userCache, err := cache.New()
+	logger.Info("Application cache initialized.")
 
 	if err != nil {
 		fatalServer(err, logger)
 	}
 
 	userService, err := user.NewService(userStorage, userCache, logger, tracer)
+	logger.Info("Application service initialized.")
 
 	if err != nil {
 		fatalServer(err, logger)
