@@ -16,6 +16,17 @@ var _ user.Storage = &db{}
 
 const KeepAlivePollPeriod = 3
 
+//const ZapInfoLevel = 0
+
+//const (
+//	LogLevelTrace = 6
+//	LogLevelDebug = 5
+//	LogLevelInfo  = 4
+//	LogLevelWarn  = 3
+//	LogLevelError = 2
+//	LogLevelNone  = 1
+//)
+
 type db struct {
 	pool   *pgxpool.Pool
 	logger *logging.Logger
@@ -45,6 +56,14 @@ func initConfig(appLogger *logging.Logger) *pgxpool.Config {
 		return nil
 	}
 	config.ConnConfig.Logger = zapadapter.NewLogger(appLogger.Logger)
+	// TODO: refactor this
+
+	zapLogLevel := appLogger.GetLevel()
+	if zapLogLevel == "INFO" {
+		config.ConnConfig.LogLevel = 2
+	} else {
+		config.ConnConfig.LogLevel = 4
+	}
 	config.ConnConfig.PreferSimpleProtocol = true
 	return config
 }

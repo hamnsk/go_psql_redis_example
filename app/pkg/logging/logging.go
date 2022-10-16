@@ -14,18 +14,18 @@ type Logger struct {
 	*zap.Logger
 }
 
+var logLevel = map[string]zapcore.Level{
+	"DEBUG": zapcore.DebugLevel,
+	"INFO":  zapcore.InfoLevel,
+	"ERROR": zapcore.ErrorLevel,
+	"WARN":  zapcore.WarnLevel,
+}
+
 func GetLogger() Logger {
 	return Logger{ee}
 }
 
 func init() {
-	logLevel := map[string]zapcore.Level{
-		"DEBUG": zapcore.DebugLevel,
-		"INFO":  zapcore.InfoLevel,
-		"ERROR": zapcore.ErrorLevel,
-		"WARN":  zapcore.WarnLevel,
-	}
-
 	config := zap.NewProductionConfig()
 	level, ok := logLevel[os.Getenv("APP_LOG_LEVEL")]
 	if ok {
@@ -69,4 +69,8 @@ func (l *Logger) Infof(msg string, args ...interface{}) {
 
 func (l *Logger) Debugf(msg string, args ...interface{}) {
 	l.Logger.Sugar().Debugf(msg, args...)
+}
+
+func (l *Logger) GetLevel() string {
+	return os.Getenv("APP_LOG_LEVEL")
 }
