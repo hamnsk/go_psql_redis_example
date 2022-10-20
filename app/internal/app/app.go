@@ -135,15 +135,13 @@ func (a *app) startMonHTTPServer() {
 	a.monSrv = srvMon
 }
 
-func (a *app) init() {
+func (a *app) start() {
+	a.parseArgs()
 	a.initSentry()
 	a.initTracer()
 	a.initStorage()
 	a.initCache()
 	a.initService()
-}
-
-func (a *app) start() {
 	a.startAppHTTPServer()
 	a.startMonHTTPServer()
 }
@@ -221,8 +219,6 @@ func newApp() *app {
 func Run() {
 
 	app := newApp()
-	app.parseArgs()
-	app.init()
 	app.start()
 
 	//gracefull shutdown init here
