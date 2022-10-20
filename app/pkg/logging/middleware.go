@@ -22,8 +22,6 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
 	rw.wroteHeader = true
-
-	return
 }
 
 func wrapResponseWriter(w http.ResponseWriter) *responseWriter {
@@ -35,7 +33,7 @@ func ResponseCodeMiddleware(logger Logger) func(http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			wrapped := wrapResponseWriter(w)
 			next.ServeHTTP(wrapped, r)
-			logger.Debug("Call uri: " + r.RequestURI, logger.Int("response_code", wrapped.status))
+			logger.Debug("Call uri: "+r.RequestURI, logger.Int("response_code", wrapped.status))
 		}
 		return http.HandlerFunc(fn)
 	}
