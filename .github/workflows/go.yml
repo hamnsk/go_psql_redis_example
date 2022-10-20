@@ -20,6 +20,7 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.18
+        cache: true
         
     - name: Verify dependencies
       run: cd ./app && go mod verify
@@ -31,5 +32,15 @@ jobs:
       run: cd ./app &&  staticcheck ./...
       
     - name: Build
-      run: cd ./app && go build -v ./...
+      env:
+        CGO_ENABLED: "0"
+        GOOS: "linux"
+      run: cd ./app && go build -o ./.bin/redis-cache-example -v ./...
+
+    - name: Upload Go build results
+      uses: actions/upload-artifact@v3
+      with:
+        name: linux-binary
+        path: ./.bin/redis-cache-example
+        retention-days: 90
 
