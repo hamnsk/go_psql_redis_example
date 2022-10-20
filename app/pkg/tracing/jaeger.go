@@ -2,8 +2,10 @@ package tracing
 
 import (
 	"fmt"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -11,7 +13,11 @@ import (
 	"redis/pkg/logging"
 )
 
-func InitTracing(l *logging.Logger) (error, *tracesdk.TracerProvider) {
+type AppTracer struct {
+	*tracesdk.TracerProvider
+}
+
+func InitTracing(l *logging.Logger) (AppTracer, error) {
 	host := os.Getenv("JAEGER_AGENT_HOST")
 	port := os.Getenv("JAEGER_AGENT_PORT")
 	if host == "" || port == "" {
@@ -25,10 +31,13 @@ func InitTracing(l *logging.Logger) (error, *tracesdk.TracerProvider) {
 	)
 	if err != nil {
 		l.Fatal("ERROR: cannot init Jaeger: " + err.Error())
-		return err, nil
+		return AppTracer{}, err
 	}
 
-	return nil, tp
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	otel.SetTracerProvider(tp)
+
+	return AppTracer{tp}, nil
 
 }
 

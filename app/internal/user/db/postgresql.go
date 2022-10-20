@@ -33,7 +33,7 @@ type db struct {
 	config *pgxpool.Config
 }
 
-func NewStorage(appLogger *logging.Logger) (*db, error) {
+func NewStorage(appLogger *logging.Logger) (user.Storage, error) {
 	config := initConfig(appLogger)
 	pool, err := dial(context.Background(), config)
 	if err != nil {
