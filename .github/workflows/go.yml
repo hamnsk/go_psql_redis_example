@@ -5,11 +5,9 @@ name: Go
 
 on:
   push:
-#    branches: [ "main" ]
-    tags:
-      - "*"
-#  pull_request:
-#    branches: [ "main" ]
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
 
@@ -31,17 +29,17 @@ jobs:
 
     - name: Run staticcheck
       run: cd ./app &&  staticcheck ./...
-      
-    - name: Build
-      env:
-        CGO_ENABLED: "0"
-        GOOS: "linux"
-      run: cd ./app && go build -o ./.bin/redis-cache-example -v ./cmd/redis-cache-example/main.go
 
-    - name: Upload Go build results
-      uses: actions/upload-artifact@v3
-      with:
-        name: linux-binary
-        path: ./app/.bin/redis-cache-example
-        retention-days: 90
+#    - name: Build
+#      env:
+#        CGO_ENABLED: "0"
+#        GOOS: "linux"
+#      run: cd ./app && go build -o ./.bin/redis-cache-example -v ./cmd/redis-cache-example/main.go
+#
+#    - name: Upload Go build results
+#      uses: actions/upload-artifact@v3
+#      with:
+#        name: linux-binary
+#        path: ./app/.bin/redis-cache-example
+#        retention-days: 90
 
