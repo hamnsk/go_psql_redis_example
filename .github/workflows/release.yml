@@ -7,7 +7,7 @@ on:
 
 jobs:
 
-  build:
+  build-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,4 +27,4 @@ jobs:
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "./app/.bin/redis-cache-example"
-          token: ${{ secrets.YOUR_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
