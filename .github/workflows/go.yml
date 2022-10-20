@@ -34,7 +34,7 @@ jobs:
       env:
         CGO_ENABLED: "0"
         GOOS: "linux"
-      run: cd ./app && go build -o ./.bin/redis-cache-example -v ./...
+      run: cd ./app && go build -o ./.bin/redis-cache-example -v ./cmd/redis-cache-example/main.go
 
     - name: Upload Go build results
       uses: actions/upload-artifact@v3
