@@ -1,3 +1,5 @@
+[![Go](https://github.com/hamnsk/go_psql_redis_example/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/hamnsk/go_psql_redis_example/actions/workflows/go.yml)
+
 # Caching in Go: Redis
 
 This is an example of a simple microservice written in go. Microservice gives us the requested ID from the user database. After getting from the database, the query result is cached in Redis for 25 seconds. For logging, a zap is used, a gorilla / mux is selected as a router. For stack trace of errors use Sentry.
