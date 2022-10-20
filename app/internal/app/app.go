@@ -21,35 +21,13 @@ import (
 )
 
 type app struct {
-	logger                   logging.Logger
-	tracer                   tracing.AppTracer
-	storage                  user.Storage
-	cache                    user.Cache
-	appRouter, metrcisRouter *mux.Router
-	service                  user.Service
-	appSrv, monSrv           *http.Server
-}
-
-func newApp() *app {
-	logger := logging.GetLogger()
-	logger.Info("Application logger initialized.")
-	router := mux.NewRouter()
-	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
-	logger.Info("Application router initialized.")
-	metricsRouter := mux.NewRouter()
-	logger.Info("Metrics router initialized.")
-
-	return &app{
-		logger:        logger,
-		tracer:        tracing.AppTracer{},
-		storage:       nil,
-		cache:         nil,
-		appRouter:     router,
-		metrcisRouter: metricsRouter,
-		service:       nil,
-		appSrv:        nil,
-		monSrv:        nil,
-	}
+	logger               logging.Logger
+	tracer               tracing.AppTracer
+	storage              user.Storage
+	cache                user.Cache
+	appRouter, monRouter *mux.Router
+	service              user.Service
+	appSrv, monSrv       *http.Server
 }
 
 func (a *app) initStorage() {
@@ -104,7 +82,7 @@ func (a *app) initService() {
 	a.logger.Info("Application service initialized.")
 
 	if err != nil {
-		fatalServer(err, a.logger)
+		a.fatalServer(err)
 	}
 	a.service = userService
 }
@@ -124,7 +102,7 @@ func (a *app) startAppHTTPServer() {
 
 	go func(s *http.Server) {
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fatalServer(err, a.logger)
+			a.fatalServer(err)
 		}
 	}(srv)
 
@@ -137,10 +115,10 @@ func (a *app) startMonHTTPServer() {
 	hc.AddReadinessCheck("database", user.DatabasePingCheck(a.storage, 1*time.Second))
 	hc.AddReadinessCheck("cache", user.CachePingCheck(a.cache, 1*time.Second))
 	metricsHandler := monitoring.GetHandler(a.logger)
-	metricsHandler.Register(a.metrcisRouter, hc)
+	metricsHandler.Register(a.monRouter, hc)
 
 	srvMon := &http.Server{
-		Handler:      a.metrcisRouter,
+		Handler:      a.monRouter,
 		Addr:         ":8081",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
@@ -148,7 +126,7 @@ func (a *app) startMonHTTPServer() {
 
 	go func(s *http.Server) {
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fatalServer(err, a.logger)
+			a.fatalServer(err)
 		}
 	}(srvMon)
 
@@ -157,31 +135,40 @@ func (a *app) startMonHTTPServer() {
 	a.monSrv = srvMon
 }
 
-func Run() {
-
-	parseArgs()
-
-	app := newApp()
-	app.initSentry()
-	app.initTracer()
-	app.initStorage()
-	app.initCache()
-	app.initService()
-
-	app.startAppHTTPServer()
-	app.startMonHTTPServer()
-
-	//gracefull shutdown init here
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGABRT, syscall.SIGQUIT, syscall.SIGHUP, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-
-	<-c
-
-	shutdown(app)
+func (a *app) init() {
+	a.initSentry()
+	a.initTracer()
+	a.initStorage()
+	a.initCache()
+	a.initService()
 }
 
-func parseArgs() {
+func (a *app) start() {
+	a.startAppHTTPServer()
+	a.startMonHTTPServer()
+}
+
+func (a *app) shutdown() {
+	a.logger.Info("Shutdown Application...")
+	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	err := a.appSrv.Shutdown(ctx)
+	if err != nil {
+		a.fatalServer(err)
+	}
+	err = a.monSrv.Shutdown(ctx)
+	if err != nil {
+		a.fatalServer(err)
+	}
+	serverCancel()
+	a.storage.Close()
+	err = a.cache.Close()
+	if err != nil {
+		a.fatalServer(err)
+	}
+	a.logger.Info("Application successful shutdown")
+}
+
+func (a *app) parseArgs() {
 	mode := flag.String("profile.mode", "", "enable profiling mode, one of [cpu, mem, mutex, block]")
 	flag.Parse()
 
@@ -203,30 +190,47 @@ func parseArgs() {
 	}
 }
 
-func fatalServer(err error, l logging.Logger) {
+func (a *app) fatalServer(err error) {
 	sentry.CaptureException(err)
 	sentry.Flush(time.Second * 5)
-	l.Fatal(err.Error())
+	a.logger.Fatal(err.Error())
 }
 
-func shutdown(a *app) {
+func newApp() *app {
+	logger := logging.GetLogger()
+	logger.Info("Application logger initialized.")
+	router := mux.NewRouter()
+	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))
+	logger.Info("Application router initialized.")
+	metricsRouter := mux.NewRouter()
+	logger.Info("Metrics router initialized.")
 
-	a.logger.Info("Shutdown Application...")
-	ctx, serverCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	err := a.appSrv.Shutdown(ctx)
-	if err != nil {
-		fatalServer(err, a.logger)
+	return &app{
+		logger:    logger,
+		tracer:    tracing.AppTracer{},
+		storage:   nil,
+		cache:     nil,
+		appRouter: router,
+		monRouter: metricsRouter,
+		service:   nil,
+		appSrv:    nil,
+		monSrv:    nil,
 	}
-	err = a.monSrv.Shutdown(ctx)
-	if err != nil {
-		fatalServer(err, a.logger)
-	}
-	serverCancel()
-	a.storage.Close()
-	err = a.cache.Close()
-	if err != nil {
-		fatalServer(err, a.logger)
-	}
-	a.logger.Info("Application successful shutdown")
+}
 
+func Run() {
+
+	app := newApp()
+	app.parseArgs()
+	app.init()
+	app.start()
+
+	//gracefull shutdown init here
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGABRT, syscall.SIGQUIT, syscall.SIGHUP, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	<-c
+
+	app.shutdown()
 }
