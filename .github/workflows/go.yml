@@ -40,6 +40,6 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: linux-binary
-        path: ./.bin/redis-cache-example
+        path: ./app/.bin/redis-cache-example
         retention-days: 90
 
