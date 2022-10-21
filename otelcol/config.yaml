@@ -1,0 +1,39 @@
+receivers:
+  jaeger:
+    protocols:
+      thrift_http:
+        endpoint: "0.0.0.0:14278"
+
+  otlp/spanmetrics:
+    protocols:
+      grpc:
+        endpoint: "localhost:12345"
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+  jaeger:
+    endpoint: "jaeger:14250"
+    tls:
+      insecure: true
+
+processors:
+  batch:
+  spanmetrics:
+    metrics_exporter: prometheus
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp, jaeger]
+      processors: [spanmetrics, batch]
+      exporters: [jaeger]
+
+    metrics:
+      receivers: [otlp/spanmetrics]
+      exporters: [prometheus]

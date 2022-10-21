@@ -72,6 +72,114 @@ func dial(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
 	return pgxpool.ConnectConfig(ctx, config)
 }
 
+func (p *db) Create(u *user.User) error {
+	query := `INSERT INTO "users" (nickname, firstname, lastname, gender, pass, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+
+	args := map[string]interface{}{
+		"nickname":  u.NickName,
+		"firstname": u.FistName,
+		"lastname":  u.LastName,
+		"gender":    u.Gender,
+		"pass":      u.Pass,
+		"status":    u.Status,
+	}
+
+	if err := conn.QueryRow(context.Background(), query, args).Scan(&u.Id); err != nil {
+		return err
+	}
+	return err
+}
+
+func (p *db) FindAll(limit, offset int64) (users []user.User, err error) {
+	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users LIMIT $1 OFFSET $2`
+
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Release()
+
+	rows, err := conn.Query(context.Background(), query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	users = make([]user.User, 0)
+
+	for rows.Next() {
+		var u user.User
+		err = rows.Scan(&u)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (p *db) FindOne(id string) (u user.User, err error) {
+	defer trace(*p.logger, id)()
+	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE id = $1`
+
+	var res user.User
+
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return user.User{}, err
+	}
+	defer conn.Release()
+
+	if err := conn.QueryRow(context.Background(), query, id).
+		Scan(&res.Id, &res.NickName, &res.FistName, &res.LastName, &res.Gender, &res.Pass, &res.Status); err != nil {
+		return user.User{}, err
+	}
+
+	return res, nil
+}
+
+func (p *db) Update(u *user.User) error {
+	query := `UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7`
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+
+	args := map[string]interface{}{
+		"nickname":  u.NickName,
+		"firstname": u.FistName,
+		"lastname":  u.LastName,
+		"gender":    u.Gender,
+		"pass":      u.Pass,
+		"status":    u.Status,
+		"id":        u.Id,
+	}
+
+	_, err = conn.Exec(context.Background(), query, args)
+	return err
+}
+
+func (p *db) Delete(id string) error {
+	query := `DELETE FROM "users" WHERE id = $1`
+
+	conn, err := p.pool.Acquire(context.Background())
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+	_, err = conn.Exec(context.Background(), query, id)
+	return err
+}
+
 func (p *db) Close() {
 	p.pool.Close()
 }
