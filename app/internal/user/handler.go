@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	userURL   = "/user/{id}"
-	crudURL   = "/user"
-	searchURL = "/user/search/"
+	withParamsUserURL    = "/user/{id:[0-9]+}"
+	withOutParamsUserURL = "/user"
+	searchURL            = "/user/search/"
 )
 
 var _ Handler = &userHandler{}
@@ -37,11 +37,11 @@ type Handler interface {
 // TODO: Refactor Handlers move out boilerplate code
 
 func (h *userHandler) Register(router *mux.Router) {
-	router.HandleFunc(crudURL, h.findAllUsers).Methods(http.MethodGet)
-	router.HandleFunc(userURL, h.findOneUser).Methods(http.MethodGet)
-	router.HandleFunc(crudURL, h.createUser).Methods(http.MethodPost)
-	router.HandleFunc(userURL, h.updateUser).Methods(http.MethodPut)
-	router.HandleFunc(userURL, h.deleteUser).Methods(http.MethodDelete)
+	router.HandleFunc(withOutParamsUserURL, h.findAllUsers).Methods(http.MethodGet)
+	router.HandleFunc(withParamsUserURL, h.findOneUser).Methods(http.MethodGet)
+	router.HandleFunc(withOutParamsUserURL, h.createUser).Methods(http.MethodPost)
+	router.HandleFunc(withParamsUserURL, h.updateUser).Methods(http.MethodPut)
+	router.HandleFunc(withParamsUserURL, h.deleteUser).Methods(http.MethodDelete)
 	router.HandleFunc(searchURL, h.getUserByNickname).Methods(http.MethodGet)
 }
 
