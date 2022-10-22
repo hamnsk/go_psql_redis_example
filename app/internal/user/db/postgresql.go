@@ -33,6 +33,11 @@ type db struct {
 	config *pgxpool.Config
 }
 
+type cursor struct {
+	start int64 // pointer to the first item for the previous page
+	end   int64 // pointer to the last item for the next page
+}
+
 func NewStorage(appLogger *logging.Logger) (user.Storage, error) {
 	config := initConfig(appLogger)
 	pool, err := dial(context.Background(), config)
@@ -86,35 +91,39 @@ func (p *db) Create(u *user.User) error {
 	return err
 }
 
-func (p *db) FindAll(limit, offset int64) (users []user.User, err error) {
+func (p *db) FindAll(limit, offset int64) (users []user.User, nextCursor int64, err error) {
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users LIMIT $1 OFFSET $2`
 
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer conn.Release()
 
 	rows, err := conn.Query(context.Background(), query, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	users = make([]user.User, 0)
 
 	for rows.Next() {
 		var u user.User
-		err = rows.Scan(&u)
+		err = rows.Scan(&u.Id, &u.NickName, &u.FistName, &u.LastName, &u.Gender, &u.Pass, &u.Status)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		users = append(users, u)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return users, nil
+
+	if len(users) > 0 {
+		nextCursor = users[len(users)-1].Id
+	}
+	return users, nextCursor, nil
 }
 
 func (p *db) FindOne(id string) (u user.User, err error) {
@@ -260,6 +269,22 @@ func (p *db) KeepAlive() {
 		}
 	}
 }
+
+// Cursor Pagination
+
+//func (p *db) newCursor(users []user.User) cursor {
+//	if len(users) == 0 {
+//		return cursor{}
+//	}
+//	return cursor{
+//		start: users[0].Id,
+//		end:   users[len(users)-1].Id,
+//	}
+//}
+//
+//func (p *db) selectNextPage(cursor int64) ([]user.User, cursor, error) {
+//
+//}
 
 func trace(l logging.Logger, id string) func() {
 	start := time.Now()

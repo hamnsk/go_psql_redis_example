@@ -24,7 +24,7 @@ type service struct {
 
 type Service interface {
 	findOne(id string, ctx context.Context) (u User, err error)
-	findAll(limit, offset int64, ctx context.Context) (users []User, err error)
+	findAll(limit, offset int64, ctx context.Context) (users []User, nextCursor int64, err error)
 	create(u *User, ctx context.Context) error
 	delete(id string, ctx context.Context) error
 	update(u *User, ctx context.Context) error
@@ -113,7 +113,7 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 
 // Get all users from DB
 // TODO: Implement caching in redis
-func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, err error) {
+func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, nextCursor int64, err error) {
 	opts := []otrace.SpanStartOption{
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
@@ -155,9 +155,9 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 	//cstatus = "MISS"
 	//s.logger.Debug("Cache miss for user id: " + id)
 	_, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
-	users, err = s.storage.FindAll(limit, offset)
+	users, nextCursor, err = s.storage.FindAll(limit, offset)
 	if err != nil {
-		return []User{}, fmt.Errorf("failed to get users. error: %w", err)
+		return []User{}, 0, fmt.Errorf("failed to get users. error: %w", err)
 	}
 	//after get user from storage place him to cache with ttl
 	//defer func() {
@@ -174,7 +174,7 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 	getFromDBSpan.End()
 	msg := fmt.Sprintf("Time for get users with trace_id=%s", traceId)
 	s.logger.Info(msg, s.logger.String("traceID", traceId))
-	return users, nil
+	return users, nextCursor, nil
 }
 
 // Delete User from DB

@@ -35,6 +35,7 @@ type Handler interface {
 }
 
 func (h *userHandler) Register(router *mux.Router) {
+	router.HandleFunc(crudURL, h.findAllUsers).Methods(http.MethodGet)
 	router.HandleFunc(userURL, h.findOneUser).Methods(http.MethodGet)
 	router.HandleFunc(crudURL, h.createUser).Methods(http.MethodPost)
 	router.HandleFunc(userURL, h.updateUser).Methods(http.MethodPut)
@@ -43,7 +44,104 @@ func (h *userHandler) Register(router *mux.Router) {
 }
 
 func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
+	tracer := h.UserService.getTracer()
+	tr := tracer.Tracer("Handler.findAllUsers")
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+
+	parentCtx, span := tr.Start(reqCtx, "FindAllUsers", opts...)
+	defer span.End()
+
+	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
+	span.SetAttributes(attribute.Key("request_method").String(r.Method))
+	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
+	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+
+	w.Header().Set("Content-Type", "application/json")
+	limitVar := r.URL.Query().Get("limit")
+	offsetVar := r.Header.Get("X-NextCursor")
+
+	// after response increment prometheus metrics
+	defer getUserRequestsTotal.Inc()
+
+	_, convertAtoiSpan := tr.Start(parentCtx, "LimitOffsetStringToInt", opts...)
+
+	limit, err := strconv.Atoi(limitVar)
+
+	if err != nil && limitVar != "" {
+		// after response increment prometheus metrics
+		//defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		//render result to client
+		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
+		h.UserService.error(err)
+		span.SetStatus(http.StatusTeapot, "Hello from teapot")
+		convertAtoiSpan.End()
+		return
+	}
+
+	if limit == 0 {
+		limit = 10
+	}
+
+	offset, err := strconv.Atoi(offsetVar)
+
+	if err != nil && offsetVar != "" {
+		// after response increment prometheus metrics
+		//defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		//render result to client
+		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
+		h.UserService.error(err)
+		span.SetStatus(http.StatusTeapot, "Hello from teapot")
+		convertAtoiSpan.End()
+		return
+	}
+
+	convertAtoiSpan.End()
+
+	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	//workHash := fmt.Sprintf("findAllUser:%s%s", limitVar, offsetVar)
+	//sflight := h.UserService.getSingleFlightGroup()
+	//// call user service to get requested user from cache, if not found get from storage and place to cache
+	//user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+	//	return h.UserService.findAll(limit, offset, callUserServiceCtx)
+	//})
+
+	users, nextCursor, err := h.UserService.findAll(int64(limit), int64(offset), callUserServiceCtx)
+
+	if err != nil {
+		// after response increment prometheus metrics
+		//defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		//render result to client
+		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
+		h.UserService.error(err)
+		span.SetStatus(http.StatusNotFound, "Not found users")
+		userServiceCallSpan.End()
+		return
+	}
+	userServiceCallSpan.End()
+
+	// after response increment prometheus metrics
+	//defer getUserRequestsSuccess.Inc()
+	// after response increment prometheus metrics
+	//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	//render result to client
+	r.Header.Add("X-NextCursor", fmt.Sprintf("%d", nextCursor))
+	renderJSON(w, users, http.StatusOK)
+	span.SetStatus(http.StatusOK, "All ok!")
 }
 
 // FindOne User Handler
