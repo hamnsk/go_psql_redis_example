@@ -11,7 +11,7 @@ Content-Type: application/json
 }
 
 ###
-PUT http://localhost:8080/user/5341
+PUT http://localhost:8080/user/5343
 Content-Type: application/json
 
 { "nickname":"restCreate0004",
@@ -23,11 +23,11 @@ Content-Type: application/json
 }
 
 ###
-GET http://localhost:8080/user/5341
+GET http://localhost:8080/user/5342
 Accept: application/json
 
 ###
-DELETE http://localhost:8080/user/5341
+DELETE http://localhost:8080/user/5342
 Accept: application/json
 
 

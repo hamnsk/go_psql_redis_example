@@ -12,21 +12,28 @@ import (
 	"time"
 )
 
+// Total Requests Metrics
 var getUserRequestsTotal prometheus.Gauge
 var updateUserRequestsTotal prometheus.Gauge
 var deleteUserRequestsTotal prometheus.Gauge
 var createUserRequestsTotal prometheus.Gauge
 var getAllUsersRequestsTotal prometheus.Gauge
+
+// Total Request Errors Metrics
 var getUserRequestsError prometheus.Gauge
 var updateUserRequestsError prometheus.Gauge
 var deleteUserRequestsError prometheus.Gauge
 var createUserRequestsError prometheus.Gauge
 var getAllUsersRequestsError prometheus.Gauge
+
+// Total Request Success Metrics
 var getUserRequestsSuccess prometheus.Gauge
 var updateUserRequestsSuccess prometheus.Gauge
 var deleteUserRequestsSuccess prometheus.Gauge
 var createUserRequestsSuccess prometheus.Gauge
 var getAllUsersRequestsSuccess prometheus.Gauge
+
+// Total Status codes Metrics
 var httpStatusCodes *prometheus.CounterVec
 
 var (
@@ -123,7 +130,7 @@ func init() {
 
 	deleteUserRequestsSuccess = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "redis_cache_example_user_update_request_success",
+			Name: "redis_cache_example_user_delete_request_success",
 			Help: "Success requests for user endpoint",
 		})
 	prometheus.MustRegister(deleteUserRequestsSuccess)
