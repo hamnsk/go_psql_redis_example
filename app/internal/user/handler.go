@@ -45,6 +45,7 @@ func (h *userHandler) Register(router *mux.Router) {
 	router.HandleFunc(searchURL, h.getUserByNickname).Methods(http.MethodGet)
 }
 
+// Find All Users with SingleFlight
 func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -148,7 +149,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 
-// FindOne User Handler
+// FindOne User Handler with SingleFlight
 func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -224,7 +225,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 
-// Create User Handler
+// Create User Handler with SingleFlight
 func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -285,7 +286,7 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusCreated, "All ok!")
 }
 
-// Update User Handler
+// Update User Handler with SingleFlight
 func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -367,7 +368,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 
-// Delete User Handler
+// Delete User Handler with SingleFlight
 func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
