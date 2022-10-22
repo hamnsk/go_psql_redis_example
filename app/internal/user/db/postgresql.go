@@ -91,18 +91,18 @@ func (p *db) Create(u *user.User) error {
 	return err
 }
 
-func (p *db) FindAll(limit, offset int64) (users []user.User, nextCursor int64, err error) {
+func (p *db) FindAll(limit, offset int64) (users []user.User, err error) {
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users WHERE id > $1 LIMIT $2`
 
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer conn.Release()
 
 	rows, err := conn.Query(context.Background(), query, offset, limit)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	users = make([]user.User, 0)
@@ -111,19 +111,16 @@ func (p *db) FindAll(limit, offset int64) (users []user.User, nextCursor int64, 
 		var u user.User
 		err = rows.Scan(&u.Id, &u.NickName, &u.FistName, &u.LastName, &u.Gender, &u.Pass, &u.Status)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		users = append(users, u)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	if len(users) > 0 {
-		nextCursor = users[len(users)-1].Id
-	}
-	return users, nextCursor, nil
+	return users, nil
 }
 
 func (p *db) FindOne(id string) (u user.User, err error) {

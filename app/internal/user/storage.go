@@ -8,7 +8,7 @@ type Storage interface {
 	Close()
 	KeepAlive()
 	Create(u *User) error
-	FindAll(limit, offset int64) (users []User, nextCursor int64, err error)
+	FindAll(limit, offset int64) (users []User, err error)
 	FindOne(id string) (User, error)
 	Update(u *User) error
 	Delete(id string) error

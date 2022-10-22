@@ -111,14 +111,12 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	convertAtoiSpan.End()
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
-	//workHash := fmt.Sprintf("findAllUser:%s%s", limitVar, offsetVar)
-	//sflight := h.UserService.getSingleFlightGroup()
+	workHash := fmt.Sprintf("findAllUser:%s%s", limitVar, offsetVar)
+	sflight := h.UserService.getSingleFlightGroup()
 	//// call user service to get requested user from cache, if not found get from storage and place to cache
-	//user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
-	//	return h.UserService.findAll(limit, offset, callUserServiceCtx)
-	//})
-
-	users, nextCursor, err := h.UserService.findAll(int64(limit), int64(offset), callUserServiceCtx)
+	users, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		return h.UserService.findAll(int64(limit), int64(offset), callUserServiceCtx)
+	})
 
 	if err != nil {
 		// after response increment prometheus metrics
@@ -139,7 +137,11 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
-	r.Header.Add("X-NextCursor", fmt.Sprintf("%d", nextCursor))
+	var nextCursor int64
+	if len(users.([]User)) > 0 {
+		nextCursor = users.([]User)[len(users.([]User))-1].Id
+	}
+	w.Header().Set("X-NextCursor", fmt.Sprintf("%d", nextCursor))
 	renderJSON(w, users, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
 }

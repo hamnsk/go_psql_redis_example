@@ -9,12 +9,3 @@ type User struct {
 	Pass     string `json:"pass"`
 	Status   uint8  `json:"status"`
 }
-
-type UserDTO struct {
-	NickName string `json:"nickname"`
-	FistName string `json:"firstname"`
-	LastName string `json:"lastname"`
-	Gender   string `json:"gender"`
-	Pass     string `json:"pass"`
-	Status   uint8  `json:"status"`
-}

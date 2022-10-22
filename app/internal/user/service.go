@@ -23,7 +23,7 @@ type service struct {
 
 type Service interface {
 	findOne(id string, ctx context.Context) (u User, err error)
-	findAll(limit, offset int64, ctx context.Context) (users []User, nextCursor int64, err error)
+	findAll(limit, offset int64, ctx context.Context) (users []User, err error)
 	create(u *User, ctx context.Context) error
 	delete(id string, ctx context.Context) error
 	update(u *User, ctx context.Context) error
@@ -44,11 +44,15 @@ func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, 
 	}, nil
 }
 
-// Find One User by ID
-func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
-	opts := []otrace.SpanStartOption{
+func newTracerOpts() []otrace.SpanStartOption {
+	return []otrace.SpanStartOption{
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
+}
+
+// Find One User by ID
+func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.findOne")
 	parentCtx, span := tr.Start(ctx, "GetUserById", opts...)
@@ -108,10 +112,8 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 
 // Get all users from DB
 // TODO: Implement caching in redis
-func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, nextCursor int64, err error) {
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
+func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, err error) {
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.findAll")
 	parentCtx, span := tr.Start(ctx, "GetUsers", opts...)
@@ -138,16 +140,16 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 			setExpireInCache.End()
 		}()
 		getFromCacheSpan.End()
-		return users, nextCursor, nil
+		return users, nil
 	}
 	getFromCacheSpan.End()
 
 	cstatus = "MISS"
 	s.logger.Debug(fmt.Sprintf("Cache miss for all users id: %d", offset))
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
-	users, nextCursor, err = s.storage.FindAll(limit, offset)
+	users, err = s.storage.FindAll(limit, offset)
 	if err != nil {
-		return []User{}, 0, fmt.Errorf("failed to get users. error: %w", err)
+		return []User{}, fmt.Errorf("failed to get users. error: %w", err)
 	}
 
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
@@ -166,14 +168,12 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 
 	}()
 	getFromDBSpan.End()
-	return users, nextCursor, nil
+	return users, nil
 }
 
 // Delete User from DB
 func (s *service) delete(id string, ctx context.Context) error {
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.delete")
 	parentCtx, span := tr.Start(ctx, "DeleteUserById", opts...)
@@ -210,9 +210,7 @@ func (s *service) delete(id string, ctx context.Context) error {
 
 // Create User in DB
 func (s *service) create(u *User, ctx context.Context) error {
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.create")
 	parentCtx, span := tr.Start(ctx, "CreateUser", opts...)
@@ -250,9 +248,7 @@ func (s *service) create(u *User, ctx context.Context) error {
 // Update User in DB
 func (s *service) update(u *User, ctx context.Context) error {
 
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.update")
 	parentCtx, span := tr.Start(ctx, "UpdateUserById", opts...)
@@ -290,9 +286,7 @@ func (s *service) update(u *User, ctx context.Context) error {
 }
 
 func (s *service) findByNickname(nickname string, ctx context.Context) (u User, err error) {
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
+	opts := newTracerOpts()
 
 	tr := s.tracer.Tracer("Service.findByNickname")
 	parentCtx, span := tr.Start(ctx, "FindUserByNicname", opts...)
