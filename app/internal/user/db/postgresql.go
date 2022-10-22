@@ -33,11 +33,6 @@ type db struct {
 	config *pgxpool.Config
 }
 
-type cursor struct {
-	start int64 // pointer to the first item for the previous page
-	end   int64 // pointer to the last item for the next page
-}
-
 func NewStorage(appLogger *logging.Logger) (user.Storage, error) {
 	config := initConfig(appLogger)
 	pool, err := dial(context.Background(), config)
