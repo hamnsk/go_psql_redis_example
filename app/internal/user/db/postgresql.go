@@ -92,7 +92,7 @@ func (p *db) Create(u *user.User) error {
 }
 
 func (p *db) FindAll(limit, offset int64) (users []user.User, nextCursor int64, err error) {
-	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users LIMIT $1 OFFSET $2`
+	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users WHERE id > $1 LIMIT $2`
 
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
@@ -100,7 +100,7 @@ func (p *db) FindAll(limit, offset int64) (users []user.User, nextCursor int64, 
 	}
 	defer conn.Release()
 
-	rows, err := conn.Query(context.Background(), query, limit, offset)
+	rows, err := conn.Query(context.Background(), query, offset, limit)
 	if err != nil {
 		return nil, 0, err
 	}

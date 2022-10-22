@@ -33,5 +33,5 @@ Accept: application/json
 
 ###
 GET http://localhost:8080/user?limit=100
-X-NextCursor: 100
+X-NextCursor: 500
 Accept: application/json
