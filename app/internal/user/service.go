@@ -195,11 +195,25 @@ func (s *service) delete(id string, ctx context.Context) error {
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	//defer trace(s.logger, id, &cstatus, traceId)()
 
-	_, deleteFromDBSpan := tr.Start(parentCtx, "deleteFromDB", opts...)
+	parentDBCtx, deleteFromDBSpan := tr.Start(parentCtx, "deleteFromDB", opts...)
 	err := s.storage.Delete(id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user by id=%s. error: %w", id, err)
 	}
+
+	// after get user from storage place him to cache with ttl
+	defer func() {
+		_, delInCacheSpan := tr.Start(parentDBCtx, "delInCache", opts...)
+		err = s.cache.Del(context.Background(), id)
+		if err != nil {
+			s.logger.Error(err.Error())
+			delInCacheSpan.End()
+		}
+		s.logger.Debug("Del from cache user by id: " + id)
+		delInCacheSpan.End()
+
+	}()
+
 	deleteFromDBSpan.End()
 	msg := fmt.Sprintf("Time for delete user by id=%s with trace_id=%s", id, traceId)
 	s.logger.Info(msg, s.logger.String("traceID", traceId))

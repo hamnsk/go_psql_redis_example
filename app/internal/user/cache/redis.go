@@ -88,6 +88,10 @@ func (c *cache) Expire(ctx context.Context, id string) error {
 	return c.client.Expire(ctx, id, 25*time.Second).Err()
 }
 
+func (c *cache) Del(ctx context.Context, id string) error {
+	return c.client.Del(ctx, id).Err()
+}
+
 func (c *cache) PingClient(ctx context.Context) error {
 	return c.client.Ping(ctx).Err()
 }
