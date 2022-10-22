@@ -9,12 +9,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	otrace "go.opentelemetry.io/otel/trace"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
 
 const (
 	userURL   = "/user/{id}"
+	crudURL   = "/user"
 	searchURL = "/user/search/"
 )
 
@@ -33,18 +35,18 @@ type Handler interface {
 }
 
 func (h *userHandler) Register(router *mux.Router) {
-	router.HandleFunc(userURL, h.getUserById).Methods(http.MethodGet)
+	router.HandleFunc(userURL, h.findOneUser).Methods(http.MethodGet)
+	router.HandleFunc(crudURL, h.createUser).Methods(http.MethodPost)
+	router.HandleFunc(userURL, h.updateUser).Methods(http.MethodPut)
+	router.HandleFunc(userURL, h.deleteUser).Methods(http.MethodDelete)
 	router.HandleFunc(searchURL, h.getUserByNickname).Methods(http.MethodGet)
-}
-
-func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// FindOne User Handler
 func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -120,6 +122,66 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 
+// Create User Handler
+func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	tracer := h.UserService.getTracer()
+	tr := tracer.Tracer("Handler.createUser")
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+
+	parentCtx, span := tr.Start(reqCtx, "CreateUser", opts...)
+	defer span.End()
+
+	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
+	span.SetAttributes(attribute.Key("request_method").String(r.Method))
+	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
+	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
+
+	w.Header().Set("Content-Type", "application/json")
+
+	user := &User{}
+	parseBody(r, user)
+
+	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	workHash := fmt.Sprintf("createUser:%s%s%s", user.FistName, user.LastName, user.NickName)
+	sflight := h.UserService.getSingleFlightGroup()
+	// call user service to get requested user from cache, if not found get from storage and place to cache
+	_, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		return nil, h.UserService.create(user, callUserServiceCtx)
+	})
+
+	if err != nil {
+		// after response increment prometheus metrics
+		//defer getUserRequestsError.Inc()
+		// after response increment prometheus metrics
+		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusBadRequest), http.MethodPut).Inc()
+		//render result to client
+		renderJSON(w, &AppError{Message: "failed to create"}, http.StatusBadRequest)
+		h.UserService.error(err)
+		span.SetStatus(http.StatusBadRequest, "Failed to create user")
+		//userServiceCallSpan.End()
+		return
+	}
+	userServiceCallSpan.End()
+
+	// after response increment prometheus metrics
+	//defer getUserRequestsSuccess.Inc()
+	// after response increment prometheus metrics
+	//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	//render result to client
+	renderJSON(w, &user, http.StatusCreated)
+	span.SetStatus(http.StatusCreated, "All ok!")
+}
+
+// Update User Handler
 func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -152,7 +214,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
+		//defer getUserRequestsError.Inc()
 		// after response increment prometheus metrics
 		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
@@ -164,19 +226,25 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	convertAtoiSpan.End()
 
+	user := &User{}
+	parseBody(r, user)
+	if uid, err := strconv.Atoi(id); err == nil {
+		user.Id = int64(uid)
+	}
+
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
-	workHash := fmt.Sprintf("getUserByID:%s", id)
+	workHash := fmt.Sprintf("updateUserByID:%s", id)
 	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
-		return h.UserService.getByID(id, callUserServiceCtx)
+	_, err, _ := sflight.Do(workHash, func() (interface{}, error) {
+		return nil, h.UserService.update(user, callUserServiceCtx)
 	})
 
 	if err != nil {
 		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
+		//defer getUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
@@ -187,7 +255,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
+	//defer getUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
@@ -195,6 +263,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 
+// Delete User Handler
 func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -416,4 +485,12 @@ func GetHandler(userService Service) Handler {
 func renderJSON(w http.ResponseWriter, val interface{}, statusCode int) {
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(val)
+}
+
+func parseBody(r *http.Request, x interface{}) {
+	if body, err := ioutil.ReadAll(r.Body); err == nil {
+		if err := json.Unmarshal([]byte(body), x); err != nil {
+			return
+		}
+	}
 }

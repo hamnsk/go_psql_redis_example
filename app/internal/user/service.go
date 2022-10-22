@@ -9,6 +9,7 @@ import (
 	otrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/singleflight"
 	"redis/pkg/logging"
+	"strconv"
 )
 
 var _ Service = &service{}
@@ -24,8 +25,9 @@ type service struct {
 type Service interface {
 	findOne(id string, ctx context.Context) (u User, err error)
 	findAll(limit, offset int64, ctx context.Context) (users []User, err error)
-	create(u User, ctx context.Context) error
+	create(u *User, ctx context.Context) error
 	delete(id string, ctx context.Context) error
+	update(u *User, ctx context.Context) error
 	getByID(id string, ctx context.Context) (u User, err error)
 	findByNickname(nickname string, ctx context.Context) (u User, err error)
 	getTracer() (t *tracesdk.TracerProvider)
@@ -205,7 +207,7 @@ func (s *service) delete(id string, ctx context.Context) error {
 }
 
 // Create User in DB
-func (s *service) create(u User, ctx context.Context) error {
+func (s *service) create(u *User, ctx context.Context) error {
 	opts := []otrace.SpanStartOption{
 		otrace.WithSpanKind(otrace.SpanKindServer),
 	}
@@ -223,14 +225,14 @@ func (s *service) create(u User, ctx context.Context) error {
 	//defer trace(s.logger, id, &cstatus, traceId)()
 
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "createInDB", opts...)
-	err := s.storage.Create(&u)
+	err := s.storage.Create(u)
 	if err != nil {
 		return fmt.Errorf("failed to create user. error: %w", err)
 	}
 	// after get user from storage place him to cache with ttl
 	defer func() {
 		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), u)
+		err = s.cache.Set(context.Background(), *u)
 		if err != nil {
 			s.logger.Error(err.Error())
 			setInCacheSpan.End()
@@ -241,6 +243,52 @@ func (s *service) create(u User, ctx context.Context) error {
 	}()
 	getFromDBSpan.End()
 	msg := fmt.Sprintf("Time for create user with id=%d with trace_id=%s", u.Id, traceId)
+	s.logger.Info(msg, s.logger.String("traceID", traceId))
+	return nil
+}
+
+// Update User in DB
+func (s *service) update(u *User, ctx context.Context) error {
+
+	opts := []otrace.SpanStartOption{
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+
+	tr := s.tracer.Tracer("Service.update")
+	parentCtx, span := tr.Start(ctx, "UpdateUserById", opts...)
+	defer span.End()
+
+	traceId := span.SpanContext().TraceID().String()
+
+	id := strconv.FormatInt(u.Id, 10)
+
+	//timer := prometheus.NewTimer(userGetDuration.WithLabelValues(u.Id))
+	// register time for all operations steps
+	//defer timer.ObserveDuration()
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
+	//defer trace(s.logger, id, &cstatus, traceId)()
+
+	parentDBCtx, updateInDBSpan := tr.Start(parentCtx, "updateInDB", opts...)
+	err := s.storage.Update(u)
+
+	if err != nil {
+		return fmt.Errorf("failed to update user. error: %w", err)
+	}
+
+	// after get user from storage place him to cache with ttl
+	defer func() {
+		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+		err = s.cache.Set(context.Background(), *u)
+		if err != nil {
+			s.logger.Error(err.Error())
+			setInCacheSpan.End()
+		}
+		s.logger.Debug("Write to cache user by id: " + id)
+		setInCacheSpan.End()
+
+	}()
+	updateInDBSpan.End()
+	msg := fmt.Sprintf("Time for update user by id=%s with trace_id=%s", id, traceId)
 	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return nil
 }

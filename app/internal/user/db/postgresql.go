@@ -80,16 +80,7 @@ func (p *db) Create(u *user.User) error {
 	}
 	defer conn.Release()
 
-	args := map[string]interface{}{
-		"nickname":  u.NickName,
-		"firstname": u.FistName,
-		"lastname":  u.LastName,
-		"gender":    u.Gender,
-		"pass":      u.Pass,
-		"status":    u.Status,
-	}
-
-	if err := conn.QueryRow(context.Background(), query, args).Scan(&u.Id); err != nil {
+	if err := conn.QueryRow(context.Background(), query, u.NickName, u.FistName, u.LastName, u.Gender, u.Pass, u.Status).Scan(&u.Id); err != nil {
 		return err
 	}
 	return err
@@ -154,17 +145,7 @@ func (p *db) Update(u *user.User) error {
 	}
 	defer conn.Release()
 
-	args := map[string]interface{}{
-		"nickname":  u.NickName,
-		"firstname": u.FistName,
-		"lastname":  u.LastName,
-		"gender":    u.Gender,
-		"pass":      u.Pass,
-		"status":    u.Status,
-		"id":        u.Id,
-	}
-
-	_, err = conn.Exec(context.Background(), query, args)
+	_, err = conn.Exec(context.Background(), query, u.NickName, u.FistName, u.LastName, u.Gender, u.Pass, u.Status, u.Id)
 	return err
 }
 

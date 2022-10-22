@@ -1,0 +1,31 @@
+###
+POST http://localhost:8080/user
+Content-Type: application/json
+
+{ "nickname":"restCreate0001",
+  "firstname":"restUser",
+  "lastname":"restUser",
+  "gender":"male",
+  "pass":"b7d7bd8ad5a68a5b4f1f24b87c12a0f2",
+  "status":1
+}
+
+###
+PUT http://localhost:8080/user/5340
+Content-Type: application/json
+
+{ "nickname":"restCreate0003",
+  "firstname":"restUser",
+  "lastname":"restUser",
+  "gender":"male",
+  "pass":"b7d7bd8ad5a68a5b4f1f24b87c12a0f2",
+  "status":1
+}
+
+###
+GET http://localhost:8080/user/5340
+Accept: application/json
+
+###
+DELETE http://localhost:8080/user/5340
+Accept: application/json
