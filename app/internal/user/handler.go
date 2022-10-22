@@ -70,7 +70,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	offsetVar := r.Header.Get("X-NextCursor")
 
 	// after response increment prometheus metrics
-	defer getUserRequestsTotal.Inc()
+	defer getAllUsersRequestsTotal.Inc()
 
 	_, convertAtoiSpan := tr.Start(parentCtx, "LimitOffsetStringToInt", opts...)
 
@@ -78,9 +78,9 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && limitVar != "" {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer getAllUsersRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
@@ -97,9 +97,9 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && offsetVar != "" {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer getAllUsersRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
@@ -122,9 +122,9 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer getAllUsersRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
@@ -135,9 +135,9 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	//defer getUserRequestsSuccess.Inc()
+	defer getAllUsersRequestsSuccess.Inc()
 	// after response increment prometheus metrics
-	//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
 	r.Header.Add("X-NextCursor", fmt.Sprintf("%d", nextCursor))
 	renderJSON(w, users, http.StatusOK)
@@ -194,7 +194,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
 	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
-		return h.UserService.getByID(id, callUserServiceCtx)
+		return h.UserService.findOne(id, callUserServiceCtx)
 	})
 
 	if err != nil {
@@ -245,6 +245,8 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
+	defer createUserRequestsTotal.Inc()
+
 	user := &User{}
 	parseBody(r, user)
 
@@ -258,9 +260,9 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer createUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusBadRequest), http.MethodPut).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusBadRequest), http.MethodPost).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "failed to create"}, http.StatusBadRequest)
 		h.UserService.error(err)
@@ -271,9 +273,9 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	//defer getUserRequestsSuccess.Inc()
+	defer createUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
-	//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusCreated), http.MethodPost).Inc()
 	//render result to client
 	renderJSON(w, &user, http.StatusCreated)
 	span.SetStatus(http.StatusCreated, "All ok!")
@@ -306,15 +308,15 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
-	//defer getUserRequestsTotal.Inc() TODO: Create Metric
+	defer updateUserRequestsTotal.Inc()
 
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer updateUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodPut).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
@@ -340,9 +342,9 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer updateUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodPut).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
@@ -353,9 +355,9 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	//defer getUserRequestsSuccess.Inc()
+	defer updateUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodPut).Inc()
 	//render result to client
 	renderJSON(w, &user, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
@@ -388,15 +390,15 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	span.SetAttributes(attribute.Key("user_id").String(id))
 	// after response increment prometheus metrics
-	//defer getUserRequestsTotal.Inc() //TODO: Create Metric
+	defer deleteUserRequestsTotal.Inc()
 
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc() //TODO: Create Metric
+		defer deleteUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc() //TODO: Create Metric
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodDelete).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
 		h.UserService.error(err)
@@ -417,9 +419,9 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// after response increment prometheus metrics
-		//defer getUserRequestsError.Inc()
+		defer deleteUserRequestsError.Inc()
 		// after response increment prometheus metrics
-		//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
+		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodDelete).Inc()
 		//render result to client
 		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
 		h.UserService.error(err)
@@ -430,89 +432,11 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	//defer getUserRequestsSuccess.Inc()
+	defer deleteUserRequestsSuccess.Inc()
 	// after response increment prometheus metrics
-	//defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodDelete).Inc()
 	//render result to client
 	renderJSON(w, User{}, http.StatusOK)
-	span.SetStatus(http.StatusOK, "All ok!")
-}
-
-func (h *userHandler) getUserById(w http.ResponseWriter, r *http.Request) {
-
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
-	tracer := h.UserService.getTracer()
-	tr := tracer.Tracer("Handler.getUserById")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
-
-	parentCtx, span := tr.Start(reqCtx, "GetUser", opts...)
-	defer span.End()
-
-	span.SetAttributes(attribute.Key("request_uri").String(r.RequestURI))
-	span.SetAttributes(attribute.Key("request_method").String(r.Method))
-	span.SetAttributes(attribute.Key("request_content_length").Int64(r.ContentLength))
-	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
-
-	w.Header().Set("Content-Type", "application/json")
-	id := mux.Vars(r)["id"]
-	span.SetAttributes(attribute.Key("user_id").String(id))
-	// after response increment prometheus metrics
-	defer getUserRequestsTotal.Inc()
-
-	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
-
-	if _, err := strconv.Atoi(id); err != nil {
-		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
-		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusTeapot), http.MethodGet).Inc()
-		//render result to client
-		renderJSON(w, &AppError{Message: fmt.Sprintf("nothing interresing: %s", r.Header.Get("Uber-Trace-Id"))}, http.StatusTeapot)
-		h.UserService.error(err)
-		span.SetStatus(http.StatusTeapot, "Hello from teapot")
-		convertAtoiSpan.End()
-		return
-	}
-	convertAtoiSpan.End()
-
-	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
-	workHash := fmt.Sprintf("getUserByID:%s", id)
-	sflight := h.UserService.getSingleFlightGroup()
-	// call user service to get requested user from cache, if not found get from storage and place to cache
-	user, err, _ := sflight.Do(workHash, func() (interface{}, error) {
-		return h.UserService.getByID(id, callUserServiceCtx)
-	})
-
-	//user, err := h.UserService.getByID(id, callUserServiceCtx)
-
-	if err != nil {
-		// after response increment prometheus metrics
-		defer getUserRequestsError.Inc()
-		// after response increment prometheus metrics
-		defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusNotFound), http.MethodGet).Inc()
-		//render result to client
-		renderJSON(w, &AppError{Message: "not found"}, http.StatusNotFound)
-		h.UserService.error(err)
-		span.SetStatus(http.StatusNotFound, "Not found user by id")
-		userServiceCallSpan.End()
-		return
-	}
-	userServiceCallSpan.End()
-
-	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
-	//render result to client
-	renderJSON(w, &user, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
 }
 

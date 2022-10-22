@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/getsentry/sentry-go"
-	"github.com/prometheus/client_golang/prometheus"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	otrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/singleflight"
@@ -28,7 +27,6 @@ type Service interface {
 	create(u *User, ctx context.Context) error
 	delete(id string, ctx context.Context) error
 	update(u *User, ctx context.Context) error
-	getByID(id string, ctx context.Context) (u User, err error)
 	findByNickname(nickname string, ctx context.Context) (u User, err error)
 	getTracer() (t *tracesdk.TracerProvider)
 	getSingleFlightGroup() (sfg *singleflight.Group)
@@ -59,9 +57,6 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 
 	traceId := span.SpanContext().TraceID().String()
 
-	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
 	defer trace(s.logger, id, &cstatus, traceId)()
 	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
@@ -89,7 +84,7 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 	cstatus = "MISS"
 	s.logger.Debug("Cache miss for user id: " + id)
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
-	u, err = s.storage.GetByID(id)
+	u, err = s.storage.FindOne(id)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
 	}
@@ -307,70 +302,6 @@ func (s *service) update(u *User, ctx context.Context) error {
 	msg := fmt.Sprintf("Time for update user by id=%s with trace_id=%s", id, traceId)
 	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return nil
-}
-
-func (s *service) getByID(id string, ctx context.Context) (u User, err error) {
-	opts := []otrace.SpanStartOption{
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-
-	tr := s.tracer.Tracer("Service.getById")
-	parentCtx, span := tr.Start(ctx, "GetUserById", opts...)
-	defer span.End()
-	var cstatus string
-
-	traceId := span.SpanContext().TraceID().String()
-
-	timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	defer timer.ObserveDuration()
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, id, &cstatus, traceId)()
-	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
-	u, err = s.cache.Get(context.Background(), id)
-	if err == nil {
-		s.logger.Debug("Cache hit for user id: " + id)
-		cstatus = "HIT"
-		// after success get user from cache refresh expire time for him
-		defer func() {
-			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
-
-			err := s.cache.Expire(context.Background(), id)
-			if err != nil {
-				s.logger.Error("Set cache expiration failed for user id: " + id)
-				s.error(err)
-				setExpireInCache.End()
-			}
-			setExpireInCache.End()
-		}()
-		getFromCacheSpan.End()
-		return u, nil
-	}
-	getFromCacheSpan.End()
-
-	cstatus = "MISS"
-	s.logger.Debug("Cache miss for user id: " + id)
-	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
-	u, err = s.storage.GetByID(id)
-	if err != nil {
-		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
-	}
-	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug("Write to cache user by id: " + id)
-		setInCacheSpan.End()
-
-	}()
-	getFromDBSpan.End()
-	//msg := fmt.Sprintf("[%s] Time for get user by id=%s with trace_id=%s", cstatus, id, traceId)
-	//s.logger.Info(msg, s.logger.String("cache_status", cstatus), s.logger.String("traceID", traceId))
-	return u, nil
 }
 
 func (s *service) findByNickname(nickname string, ctx context.Context) (u User, err error) {

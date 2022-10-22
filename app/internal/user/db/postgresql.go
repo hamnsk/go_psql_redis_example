@@ -174,26 +174,6 @@ func (p *db) Close() {
 	p.pool.Close()
 }
 
-func (p *db) GetByID(id string) (u user.User, err error) {
-	defer trace(*p.logger, id)()
-	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE id = $1`
-
-	var res user.User
-
-	conn, err := p.pool.Acquire(context.Background())
-	if err != nil {
-		return user.User{}, err
-	}
-	defer conn.Release()
-
-	if err := conn.QueryRow(context.Background(), query, id).
-		Scan(&res.Id, &res.NickName, &res.FistName, &res.LastName, &res.Gender, &res.Pass, &res.Status); err != nil {
-		return user.User{}, err
-	}
-
-	return res, nil
-}
-
 func (p *db) FindOneByNickName(nickname string) (u user.User, err error) {
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE nickname LIKE $1 LIMIT 1`
 
