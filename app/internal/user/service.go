@@ -31,7 +31,6 @@ type Service interface {
 	getTracer() (t *tracesdk.TracerProvider)
 	getSingleFlightGroup() (sfg *singleflight.Group)
 	error(err error)
-	info(msg string)
 }
 
 func NewService(userStorage Storage, userCache Cache, appLogger logging.Logger, appTracer *tracesdk.TracerProvider) (Service, error) {
@@ -340,10 +339,6 @@ func (s *service) error(err error) {
 	// TODO: disable flush migrate to syncHTTPTransport https://docs.sentry.io/platforms/go/guides/http/configuration/transports/
 	//sentry.Flush(time.Second * 1)
 	s.logger.Error(err.Error())
-}
-
-func (s *service) info(msg string) {
-	s.logger.Info(msg)
 }
 
 func (s *service) getTracer() (t *tracesdk.TracerProvider) {
