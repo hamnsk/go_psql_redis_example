@@ -1,0 +1,50 @@
+### CreateUser
+POST http://localhost:8080/user
+Content-Type: application/json
+
+{ "nickname":"restCreate0001",
+  "firstname":"restUser",
+  "lastname":"restUser",
+  "gender":"male",
+  "pass":"b7d7bd8ad5a68a5b4f1f24b87c12a0f2",
+  "status":1
+}
+
+### UpdateUser
+PUT http://localhost:8080/user/5343
+Content-Type: application/json
+
+{ "nickname":"restCreate0004",
+  "firstname":"restUser",
+  "lastname":"restUser",
+  "gender":"male",
+  "pass":"b7d7bd8ad5a68a5b4f1f24b87c12a0f2",
+  "status":1
+}
+
+### GetUser
+GET http://localhost:8080/user/5342
+Accept: application/json
+
+### DeleteUser
+DELETE http://localhost:8080/user/5342
+Accept: application/json
+
+
+### GetAllUsers
+GET http://localhost:8080/user?limit=10
+X-NextCursor: 0
+Accept: application/json
+
+> {%
+client.global.set("nextCursor", response.headers.valueOf("X-Nextcursor"))
+ %}
+
+### GetAllUsersCursor
+GET http://localhost:8080/user?limit=10
+X-NextCursor: {{nextCursor}}
+Accept: application/json
+
+> {%
+client.global.set("nextCursor", response.headers.valueOf("X-Nextcursor"))
+ %}

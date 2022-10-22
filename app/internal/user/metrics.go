@@ -12,9 +12,28 @@ import (
 	"time"
 )
 
+// Total Requests Metrics
 var getUserRequestsTotal prometheus.Gauge
+var updateUserRequestsTotal prometheus.Gauge
+var deleteUserRequestsTotal prometheus.Gauge
+var createUserRequestsTotal prometheus.Gauge
+var getAllUsersRequestsTotal prometheus.Gauge
+
+// Total Request Errors Metrics
 var getUserRequestsError prometheus.Gauge
+var updateUserRequestsError prometheus.Gauge
+var deleteUserRequestsError prometheus.Gauge
+var createUserRequestsError prometheus.Gauge
+var getAllUsersRequestsError prometheus.Gauge
+
+// Total Request Success Metrics
 var getUserRequestsSuccess prometheus.Gauge
+var updateUserRequestsSuccess prometheus.Gauge
+var deleteUserRequestsSuccess prometheus.Gauge
+var createUserRequestsSuccess prometheus.Gauge
+var getAllUsersRequestsSuccess prometheus.Gauge
+
+// Total Status codes Metrics
 var httpStatusCodes *prometheus.CounterVec
 
 var (
@@ -22,10 +41,6 @@ var (
 		Name: "redis_cache_example_user_http_request_duration_seconds",
 		Help: "Duration of HTTP requests.",
 	}, []string{"path"})
-	userGetDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "redis_cache_example_user_get_duration_seconds",
-		Help: "Duration of get user operations.",
-	}, []string{"id"})
 )
 
 func init() {
@@ -36,6 +51,34 @@ func init() {
 		})
 	prometheus.MustRegister(getUserRequestsTotal)
 
+	updateUserRequestsTotal = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_update_request_total",
+			Help: "Total requests for user endpoint",
+		})
+	prometheus.MustRegister(updateUserRequestsTotal)
+
+	deleteUserRequestsTotal = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_delete_request_total",
+			Help: "Total requests for user endpoint",
+		})
+	prometheus.MustRegister(deleteUserRequestsTotal)
+
+	createUserRequestsTotal = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_create_request_total",
+			Help: "Total requests for user endpoint",
+		})
+	prometheus.MustRegister(createUserRequestsTotal)
+
+	getAllUsersRequestsTotal = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_get_all_request_total",
+			Help: "Total requests for user endpoint",
+		})
+	prometheus.MustRegister(getAllUsersRequestsTotal)
+
 	getUserRequestsError = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "redis_cache_example_user_get_request_error",
@@ -43,12 +86,68 @@ func init() {
 		})
 	prometheus.MustRegister(getUserRequestsError)
 
+	updateUserRequestsError = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_update_request_error",
+			Help: "Error requests for user endpoint",
+		})
+	prometheus.MustRegister(updateUserRequestsError)
+
+	deleteUserRequestsError = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_delete_request_error",
+			Help: "Error requests for user endpoint",
+		})
+	prometheus.MustRegister(deleteUserRequestsError)
+
+	createUserRequestsError = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_create_request_error",
+			Help: "Error requests for user endpoint",
+		})
+	prometheus.MustRegister(createUserRequestsError)
+
+	getAllUsersRequestsError = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_get_all_request_error",
+			Help: "Error requests for user endpoint",
+		})
+	prometheus.MustRegister(getAllUsersRequestsError)
+
 	getUserRequestsSuccess = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "redis_cache_example_user_get_request_success",
 			Help: "Success requests for user endpoint",
 		})
 	prometheus.MustRegister(getUserRequestsSuccess)
+
+	updateUserRequestsSuccess = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_update_request_success",
+			Help: "Success requests for user endpoint",
+		})
+	prometheus.MustRegister(updateUserRequestsSuccess)
+
+	deleteUserRequestsSuccess = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_delete_request_success",
+			Help: "Success requests for user endpoint",
+		})
+	prometheus.MustRegister(deleteUserRequestsSuccess)
+
+	createUserRequestsSuccess = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_create_request_success",
+			Help: "Success requests for user endpoint",
+		})
+	prometheus.MustRegister(createUserRequestsSuccess)
+
+	getAllUsersRequestsSuccess = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_cache_example_user_get_all_request_success",
+			Help: "Success requests for user endpoint",
+		})
+	prometheus.MustRegister(getAllUsersRequestsSuccess)
 
 	httpStatusCodes = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
