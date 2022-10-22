@@ -58,7 +58,7 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 	traceId := span.SpanContext().TraceID().String()
 
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, id, &cstatus, traceId)()
+	defer trace(s.logger, "findOne", &cstatus, traceId)()
 	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
@@ -101,8 +101,6 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 
 	}()
 	getFromDBSpan.End()
-	msg := fmt.Sprintf("[%s] Time for get user by id=%s with trace_id=%s", cstatus, id, traceId)
-	s.logger.Info(msg, s.logger.String("cache_status", cstatus), s.logger.String("traceID", traceId))
 	return u, nil
 }
 
@@ -116,41 +114,36 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 	tr := s.tracer.Tracer("Service.findAll")
 	parentCtx, span := tr.Start(ctx, "GetUsers", opts...)
 	defer span.End()
-	//var cstatus string
+	var cstatus string
 
 	traceId := span.SpanContext().TraceID().String()
 
-	//timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	//defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	//defer trace(s.logger, id, &cstatus, traceId)()
+	defer trace(s.logger, "findAll", &cstatus, traceId)()
 	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
 	users, err = s.cache.GetAll(context.Background(), offset)
 	if err == nil {
 		s.logger.Debug(fmt.Sprintf("Cache hit for users by offset: %d", offset))
-		//cstatus = "HIT"
+		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
 		defer func() {
 			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
 
 			err := s.cache.ExpireAll(context.Background(), offset)
 			if err != nil {
-				//s.logger.Error("Set cache expiration failed for user id: " + id)
+				s.logger.Error(fmt.Sprintf("Set cache expiration failed for get all users offset: %d", offset))
 				s.error(err)
 				setExpireInCache.End()
 			}
 			setExpireInCache.End()
 		}()
 		getFromCacheSpan.End()
-		msg := fmt.Sprintf("Time for get users with trace_id=%s", traceId)
-		s.logger.Info(msg, s.logger.String("traceID", traceId))
 		return users, nextCursor, nil
 	}
 	getFromCacheSpan.End()
 
-	//cstatus = "MISS"
-	//s.logger.Debug("Cache miss for user id: " + id)
+	cstatus = "MISS"
+	s.logger.Debug(fmt.Sprintf("Cache miss for all users id: %d", offset))
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "getFromDB", opts...)
 	users, nextCursor, err = s.storage.FindAll(limit, offset)
 	if err != nil {
@@ -169,8 +162,6 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 
 	}()
 	getFromDBSpan.End()
-	msg := fmt.Sprintf("Time for get users with trace_id=%s", traceId)
-	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return users, nextCursor, nil
 }
 
@@ -183,14 +174,12 @@ func (s *service) delete(id string, ctx context.Context) error {
 	tr := s.tracer.Tracer("Service.delete")
 	parentCtx, span := tr.Start(ctx, "DeleteUserById", opts...)
 	defer span.End()
+	cstatus := "NOUSE"
 
 	traceId := span.SpanContext().TraceID().String()
 
-	//timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	//defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	//defer trace(s.logger, id, &cstatus, traceId)()
+	defer trace(s.logger, "delete", &cstatus, traceId)()
 
 	parentDBCtx, deleteFromDBSpan := tr.Start(parentCtx, "deleteFromDB", opts...)
 	err := s.storage.Delete(id)
@@ -212,8 +201,6 @@ func (s *service) delete(id string, ctx context.Context) error {
 	}()
 
 	deleteFromDBSpan.End()
-	msg := fmt.Sprintf("Time for delete user by id=%s with trace_id=%s", id, traceId)
-	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return nil
 }
 
@@ -226,14 +213,12 @@ func (s *service) create(u *User, ctx context.Context) error {
 	tr := s.tracer.Tracer("Service.create")
 	parentCtx, span := tr.Start(ctx, "CreateUser", opts...)
 	defer span.End()
+	cstatus := "NOUSE"
 
 	traceId := span.SpanContext().TraceID().String()
 
-	//timer := prometheus.NewTimer(userGetDuration.WithLabelValues(id))
-	// register time for all operations steps
-	//defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	//defer trace(s.logger, id, &cstatus, traceId)()
+	defer trace(s.logger, "create", &cstatus, traceId)()
 
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "createInDB", opts...)
 	err := s.storage.Create(u)
@@ -253,8 +238,6 @@ func (s *service) create(u *User, ctx context.Context) error {
 
 	}()
 	getFromDBSpan.End()
-	msg := fmt.Sprintf("Time for create user with id=%d with trace_id=%s", u.Id, traceId)
-	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return nil
 }
 
@@ -268,16 +251,14 @@ func (s *service) update(u *User, ctx context.Context) error {
 	tr := s.tracer.Tracer("Service.update")
 	parentCtx, span := tr.Start(ctx, "UpdateUserById", opts...)
 	defer span.End()
+	cstatus := "NOUSE"
 
 	traceId := span.SpanContext().TraceID().String()
 
 	id := strconv.FormatInt(u.Id, 10)
 
-	//timer := prometheus.NewTimer(userGetDuration.WithLabelValues(u.Id))
-	// register time for all operations steps
-	//defer timer.ObserveDuration()
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	//defer trace(s.logger, id, &cstatus, traceId)()
+	defer trace(s.logger, id, &cstatus, traceId)()
 
 	parentDBCtx, updateInDBSpan := tr.Start(parentCtx, "updateInDB", opts...)
 	err := s.storage.Update(u)
@@ -299,8 +280,6 @@ func (s *service) update(u *User, ctx context.Context) error {
 
 	}()
 	updateInDBSpan.End()
-	msg := fmt.Sprintf("Time for update user by id=%s with trace_id=%s", id, traceId)
-	s.logger.Info(msg, s.logger.String("traceID", traceId))
 	return nil
 }
 
