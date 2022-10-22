@@ -34,6 +34,8 @@ type Handler interface {
 	Register(router *mux.Router)
 }
 
+// TODO: Refactor Handlers move out boilerplate code
+
 func (h *userHandler) Register(router *mux.Router) {
 	router.HandleFunc(crudURL, h.findAllUsers).Methods(http.MethodGet)
 	router.HandleFunc(userURL, h.findOneUser).Methods(http.MethodGet)
