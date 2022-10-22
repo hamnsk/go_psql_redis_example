@@ -270,22 +270,6 @@ func (p *db) KeepAlive() {
 	}
 }
 
-// Cursor Pagination
-
-//func (p *db) newCursor(users []user.User) cursor {
-//	if len(users) == 0 {
-//		return cursor{}
-//	}
-//	return cursor{
-//		start: users[0].Id,
-//		end:   users[len(users)-1].Id,
-//	}
-//}
-//
-//func (p *db) selectNextPage(cursor int64) ([]user.User, cursor, error) {
-//
-//}
-
 func trace(l logging.Logger, id string) func() {
 	start := time.Now()
 	return func() {
