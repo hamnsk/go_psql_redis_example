@@ -23,7 +23,7 @@ Content-Type: application/json
 }
 
 ### GetUser
-GET http://localhost:8080/user/53566
+GET http://localhost:8080/user/dhfghdfg
 Accept: application/json
 
 ### DeleteUser
@@ -38,13 +38,25 @@ Accept: application/json
 
 > {%
 client.global.set("nextCursor", response.headers.valueOf("X-Nextcursor"))
+client.global.set("prevCursor", response.headers.valueOf("X-Prevcursor"))
  %}
 
-### GetAllUsersCursor
+### GetAllUsersCursorNext
 GET http://localhost:8080/user?limit=10
 X-NextCursor: {{nextCursor}}
 Accept: application/json
 
 > {%
 client.global.set("nextCursor", response.headers.valueOf("X-Nextcursor"))
+client.global.set("prevCursor", response.headers.valueOf("X-Prevcursor"))
+ %}
+
+### GetAllUsersCursorPrev
+GET http://localhost:8080/user?limit=10
+X-NextCursor: {{prevCursor}}
+Accept: application/json
+
+> {%
+client.global.set("nextCursor", response.headers.valueOf("X-Nextcursor"))
+client.global.set("prevCursor", response.headers.valueOf("X-Prevcursor"))
  %}

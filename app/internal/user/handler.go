@@ -35,12 +35,12 @@ type Handler interface {
 	Register(router *mux.Router)
 }
 
-type handleError struct {
+type respData struct {
 	w          http.ResponseWriter
 	span       otrace.Span
 	statusCode int
 	httpMethod string
-	err        error
+	payload    interface{}
 }
 
 // TODO: Refactor Handlers move out boilerplate code
@@ -85,12 +85,12 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	limit, err := strconv.Atoi(limitVar)
 
 	if err != nil && limitVar != "" {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getAllUsersRequestsError.Inc()
@@ -109,12 +109,12 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil && offsetVar != "" {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getAllUsersRequestsError.Inc()
@@ -133,12 +133,12 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getAllUsersRequestsError.Inc()
@@ -148,9 +148,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer getAllUsersRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
+	getAllUsersRequestsSuccess.Inc()
 	//render result to client
 	var nextCursor, prevCursor int64
 	if len(users.([]User)) > 0 {
@@ -162,8 +160,13 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-NextCursor", fmt.Sprintf("%d", nextCursor))
 	w.Header().Set("X-PrevCursor", fmt.Sprintf("%d", prevCursor))
-	renderJSON(w, users, http.StatusOK)
-	span.SetStatus(http.StatusOK, "All ok!")
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusOK,
+		httpMethod: http.MethodGet,
+		payload:    &users,
+	})
 }
 
 // FindOne User Handler with SingleFlight
@@ -194,12 +197,12 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getUserRequestsError.Inc()
@@ -217,12 +220,12 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getUserRequestsError.Inc()
@@ -232,12 +235,15 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
-	//render result to client
-	renderJSON(w, &user, http.StatusOK)
-	span.SetStatus(http.StatusOK, "All ok!")
+	getUserRequestsSuccess.Inc()
+
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusOK,
+		httpMethod: http.MethodGet,
+		payload:    &user,
+	})
 }
 
 // Create User Handler with SingleFlight
@@ -274,12 +280,12 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusBadRequest,
 			httpMethod: http.MethodPost,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		createUserRequestsError.Inc()
@@ -289,12 +295,14 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer createUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusCreated), http.MethodPost).Inc()
-	//render result to client
-	renderJSON(w, &user, http.StatusCreated)
-	span.SetStatus(http.StatusCreated, "All ok!")
+	createUserRequestsSuccess.Inc()
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusCreated,
+		httpMethod: http.MethodPost,
+		payload:    &user,
+	})
 }
 
 // Update User Handler with SingleFlight
@@ -325,12 +333,12 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodPut,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		updateUserRequestsError.Inc()
@@ -354,12 +362,12 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodPut,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		updateUserRequestsError.Inc()
@@ -370,11 +378,13 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	// after response increment prometheus metrics
 	defer updateUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodPut).Inc()
-	//render result to client
-	renderJSON(w, &user, http.StatusOK)
-	span.SetStatus(http.StatusOK, "All ok!")
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusOK,
+		httpMethod: http.MethodPut,
+		payload:    &user,
+	})
 }
 
 // Delete User Handler with SingleFlight
@@ -405,12 +415,12 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	_, convertAtoiSpan := tr.Start(parentCtx, "StringToInt", opts...)
 
 	if _, err := strconv.Atoi(id); err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodDelete,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		deleteUserRequestsError.Inc()
@@ -429,12 +439,12 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodDelete,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		deleteUserRequestsError.Inc()
@@ -445,11 +455,13 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// after response increment prometheus metrics
 	defer deleteUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodDelete).Inc()
-	//render result to client
-	renderJSON(w, User{}, http.StatusOK)
-	span.SetStatus(http.StatusOK, "All ok!")
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusOK,
+		httpMethod: http.MethodDelete,
+		payload:    User{},
+	})
 }
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
@@ -488,23 +500,26 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	})
 
 	if err != nil {
-		h.handleErrorResponse(&handleError{
+		h.handleErrorResponse(&respData{
 			w:          w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
-			err:        err,
+			payload:    err,
 		})
 		// after response increment prometheus metrics
 		getUserRequestsError.Inc()
 		return
 	}
 	// after response increment prometheus metrics
-	defer getUserRequestsSuccess.Inc()
-	// after response increment prometheus metrics
-	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
-	//render result to client
-	renderJSON(w, &user, http.StatusOK)
+	getUserRequestsSuccess.Inc()
+	h.handleSuccessResponse(&respData{
+		w:          w,
+		span:       span,
+		statusCode: http.StatusOK,
+		httpMethod: http.MethodGet,
+		payload:    user,
+	})
 }
 
 func (h *userHandler) setSpanAttributes(span otrace.Span, r *http.Request) {
@@ -514,7 +529,7 @@ func (h *userHandler) setSpanAttributes(span otrace.Span, r *http.Request) {
 	span.SetAttributes(attribute.Key("user_agent").String(r.Header.Get("User-Agent")))
 }
 
-func (h *userHandler) handleErrorResponse(he *handleError) {
+func (h *userHandler) handleErrorResponse(he *respData) {
 	traceId := he.span.SpanContext().TraceID().String()
 	he.span.SetStatus(codes.Code(he.statusCode), "request processing ended with an error")
 	// after response increment prometheus metrics
@@ -522,7 +537,15 @@ func (h *userHandler) handleErrorResponse(he *handleError) {
 	//render result to client
 	renderJSON(he.w, &AppError{Message: fmt.Sprintf("request processing ended with an error, "+
 		"contact support by passing them the request ID: %s", traceId)}, he.statusCode)
-	h.UserService.error(he.err)
+	h.UserService.error(he.payload.(error))
+}
+
+func (h *userHandler) handleSuccessResponse(hs *respData) {
+	// after response increment prometheus metrics
+	httpStatusCodes.WithLabelValues(strconv.Itoa(hs.statusCode), hs.httpMethod).Inc()
+	//render result to client
+	renderJSON(hs.w, &hs.payload, hs.statusCode)
+	hs.span.SetStatus(codes.Code(hs.statusCode), "All ok!")
 }
 
 func GetHandler(userService Service) Handler {
