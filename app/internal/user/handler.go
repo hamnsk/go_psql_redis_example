@@ -92,11 +92,15 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if limit == 0 {
+	if limit == 0 || limit < 0 {
 		limit = 10
 	}
 
 	offset, err := strconv.Atoi(offsetVar)
+
+	if offset < 0 {
+		offset = 0
+	}
 
 	if err != nil && offsetVar != "" {
 		// after response increment prometheus metrics
@@ -140,11 +144,16 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	// after response increment prometheus metrics
 	defer httpStatusCodes.WithLabelValues(strconv.Itoa(http.StatusOK), http.MethodGet).Inc()
 	//render result to client
-	var nextCursor int64
+	var nextCursor, prevCursor int64
 	if len(users.([]User)) > 0 {
 		nextCursor = users.([]User)[len(users.([]User))-1].Id
+		prevCursor = users.([]User)[0].Id - int64(limit) - 1
+		if prevCursor < 0 {
+			prevCursor = 0
+		}
 	}
 	w.Header().Set("X-NextCursor", fmt.Sprintf("%d", nextCursor))
+	w.Header().Set("X-PrevCursor", fmt.Sprintf("%d", prevCursor))
 	renderJSON(w, users, http.StatusOK)
 	span.SetStatus(http.StatusOK, "All ok!")
 }

@@ -32,8 +32,8 @@ Accept: application/json
 
 
 ### GetAllUsers
-GET http://localhost:8080/user?limit=10
-X-NextCursor: 0
+GET http://localhost:8080/user?limit=-10
+X-NextCursor: -10
 Accept: application/json
 
 > {%
