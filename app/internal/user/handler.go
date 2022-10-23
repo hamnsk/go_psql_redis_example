@@ -56,18 +56,12 @@ func (h *userHandler) Register(router *mux.Router) {
 
 // Find All Users with SingleFlight
 func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.findAllUsers")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	parentCtx, span := tr.Start(reqCtx, "FindAllUsers", opts...)
 	defer span.End()
@@ -125,7 +119,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	convertAtoiSpan.End()
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
-	workHash := fmt.Sprintf("findAllUser:%s%s", limitVar, offsetVar)
+	workHash := fmt.Sprintf("findAllUser:%d%d", limit, offset)
 	sflight := h.UserService.getSingleFlightGroup()
 	//// call user service to get requested user from cache, if not found get from storage and place to cache
 	users, err, _ := sflight.Do(workHash, func() (interface{}, error) {
@@ -171,18 +165,12 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 // FindOne User Handler with SingleFlight
 func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
 
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.findOneUser")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	parentCtx, span := tr.Start(reqCtx, "FindUser", opts...)
 	defer span.End()
@@ -248,18 +236,12 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 
 // Create User Handler with SingleFlight
 func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
 
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.createUser")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	parentCtx, span := tr.Start(reqCtx, "CreateUser", opts...)
 	defer span.End()
@@ -307,18 +289,11 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 // Update User Handler with SingleFlight
 func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.updateUser")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	parentCtx, span := tr.Start(reqCtx, "UpdateUser", opts...)
 	defer span.End()
@@ -389,18 +364,12 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 // Delete User Handler with SingleFlight
 func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
 
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.deleteUser")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	parentCtx, span := tr.Start(reqCtx, "DeleteUser", opts...)
 	defer span.End()
@@ -466,18 +435,11 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) {
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
 	tracer := h.UserService.getTracer()
 	tr := tracer.Tracer("Handler.getUserById")
-	opts := []otrace.SpanStartOption{
-		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		otrace.WithSpanKind(otrace.SpanKindServer),
-	}
-	_, _, spanContext := otelhttptrace.Extract(ctx, r)
-	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	// Return ctx, cancelFunc, opts
+	opts, cancel, reqCtx := h.configTracer(r)
+	defer cancel()
 
 	_, span := tr.Start(reqCtx, "GetUser", opts...)
 
@@ -546,6 +508,18 @@ func (h *userHandler) handleSuccessResponse(hs *respData) {
 	//render result to client
 	renderJSON(*hs.w, &hs.payload, hs.statusCode)
 	hs.span.SetStatus(codes.Code(hs.statusCode), "All ok!")
+}
+
+func (h *userHandler) configTracer(r *http.Request) ([]otrace.SpanStartOption, context.CancelFunc, context.Context) {
+	ctx, cancel := context.WithCancel(r.Context())
+	opts := []otrace.SpanStartOption{
+		otrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		otrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		otrace.WithSpanKind(otrace.SpanKindServer),
+	}
+	_, _, spanContext := otelhttptrace.Extract(ctx, r)
+	reqCtx := otrace.ContextWithSpanContext(ctx, spanContext)
+	return opts, cancel, reqCtx
 }
 
 func GetHandler(userService Service) Handler {

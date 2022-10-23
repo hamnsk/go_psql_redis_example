@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"fmt"
 	"github.com/go-redis/redis/v9"
 	"os"
 	"redis/internal/user"
@@ -65,8 +64,8 @@ func (c *cache) Get(ctx context.Context, id string) (user.User, error) {
 	return res, nil
 }
 
-func (c *cache) GetAll(ctx context.Context, key int64) (users []user.User, err error) {
-	cmd := c.client.Get(ctx, fmt.Sprintf("ALL_USESR_BY_OFFSET%d", key))
+func (c *cache) GetAll(ctx context.Context, key string) (users []user.User, err error) {
+	cmd := c.client.Get(ctx, key)
 	cmdb, err := cmd.Bytes()
 	if err != nil {
 		return []user.User{}, err
@@ -101,22 +100,22 @@ func (c *cache) SetByNickname(ctx context.Context, u user.User) error {
 	return c.client.Set(ctx, u.NickName, b.Bytes(), 25*time.Second).Err()
 }
 
-func (c *cache) SetAll(ctx context.Context, key int64, val []user.User) error {
+func (c *cache) SetAll(ctx context.Context, key string, val []user.User) error {
 	var b bytes.Buffer
 
 	if err := gob.NewEncoder(&b).Encode(val); err != nil {
 		return err
 	}
 
-	return c.client.Set(ctx, fmt.Sprintf("ALL_USESR_BY_OFFSET%d", key), b.Bytes(), 25*time.Second).Err()
+	return c.client.Set(ctx, key, b.Bytes(), 25*time.Second).Err()
 }
 
 func (c *cache) Expire(ctx context.Context, id string) error {
 	return c.client.Expire(ctx, id, 25*time.Second).Err()
 }
 
-func (c *cache) ExpireAll(ctx context.Context, key int64) error {
-	return c.client.Expire(ctx, fmt.Sprintf("ALL_USESR_BY_OFFSET%d", key), 25*time.Second).Err()
+func (c *cache) ExpireAll(ctx context.Context, key string) error {
+	return c.client.Expire(ctx, key, 25*time.Second).Err()
 }
 
 func (c *cache) Del(ctx context.Context, id string) error {

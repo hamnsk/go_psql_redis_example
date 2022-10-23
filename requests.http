@@ -10,8 +10,12 @@ Content-Type: application/json
   "status":1
 }
 
+> {%
+client.global.set("user_id", response.body.id)
+ %}
+
 ### UpdateUser
-PUT http://localhost:8080/user/53566
+PUT http://localhost:8080/user/{{user_id}}
 Content-Type: application/json
 
 { "nickname":"restCreate0009",
@@ -23,17 +27,21 @@ Content-Type: application/json
 }
 
 ### GetUser
-GET http://localhost:8080/user/dhfghdfg
+GET http://localhost:8080/user/{{user_id}}
 Accept: application/json
 
 ### DeleteUser
-DELETE http://localhost:8080/user/gfhdfgh
+DELETE http://localhost:8080/user/{{user_id}}
 Accept: application/json
 
 
+### GetAllUsersNoCursor
+GET http://localhost:8080/user?limit=15
+Accept: application/json
+
 ### GetAllUsers
-GET http://localhost:8080/user?limit=-10
-X-NextCursor: -10
+GET http://localhost:8080/user?limit=100
+X-NextCursor: 100
 Accept: application/json
 
 > {%
@@ -42,7 +50,7 @@ client.global.set("prevCursor", response.headers.valueOf("X-Prevcursor"))
  %}
 
 ### GetAllUsersCursorNext
-GET http://localhost:8080/user?limit=10
+GET http://localhost:8080/user?limit=100
 X-NextCursor: {{nextCursor}}
 Accept: application/json
 
@@ -52,7 +60,7 @@ client.global.set("prevCursor", response.headers.valueOf("X-Prevcursor"))
  %}
 
 ### GetAllUsersCursorPrev
-GET http://localhost:8080/user?limit=10
+GET http://localhost:8080/user?limit=100
 X-NextCursor: {{prevCursor}}
 Accept: application/json
 
