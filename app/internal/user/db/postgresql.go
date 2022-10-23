@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"redis/internal/user"
 	"redis/pkg/logging"
@@ -218,11 +217,11 @@ func (p *db) KeepAlive() {
 	}
 }
 
-func trace(l logging.Logger, id string) func() {
-	start := time.Now()
-	return func() {
-		t := time.Since(start)
-		msg := fmt.Sprintf("Time for get user by id=%s from Database is: %s", id, t)
-		l.Info(msg, l.Duration("time_duration", t))
-	}
-}
+//func trace(l logging.Logger, id string) func() {
+//	start := time.Now()
+//	return func() {
+//		t := time.Since(start)
+//		msg := fmt.Sprintf("Time for get user by id=%s from Database is: %s", id, t)
+//		l.Info(msg, l.Duration("time_duration", t))
+//	}
+//}
