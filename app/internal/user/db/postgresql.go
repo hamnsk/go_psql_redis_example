@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"redis/internal/user"
@@ -139,10 +140,7 @@ func (p *db) FindOne(id string) (u user.User, err error) {
 }
 
 func (p *db) Update(u *user.User) error {
-	//	query := `UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7`
-
-	query := `DO $$ BEGIN IF EXISTS (SELECT nickname FROM "users" WHERE id=$7) THEN
-UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7; END IF; END$$`
+	query := `UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7 RETURNING id`
 
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
@@ -150,19 +148,25 @@ UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, s
 	}
 	defer conn.Release()
 
-	_, err = conn.Exec(context.Background(), query, u.NickName, u.FistName, u.LastName, u.Gender, u.Pass, u.Status, u.Id)
+	cmdTag, err := conn.Exec(context.Background(), query, u.NickName, u.FistName, u.LastName, u.Gender, u.Pass, u.Status, u.Id)
+	if cmdTag.RowsAffected() == 0 {
+		return errors.New("user for update not found")
+	}
 	return err
 }
 
 func (p *db) Delete(id string) error {
-	query := `DELETE FROM "users" WHERE id = $1`
+	query := `DELETE FROM "users" WHERE id = $1 RETURNING id`
 
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
 		return err
 	}
 	defer conn.Release()
-	_, err = conn.Exec(context.Background(), query, id)
+	cmdTag, err := conn.Exec(context.Background(), query, id)
+	if cmdTag.RowsAffected() == 0 {
+		return errors.New("user for delete not found")
+	}
 	return err
 }
 
