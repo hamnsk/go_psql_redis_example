@@ -119,7 +119,7 @@ func (p *db) FindAll(limit, offset int64) (users []user.User, err error) {
 }
 
 func (p *db) FindOne(id string) (u user.User, err error) {
-	defer trace(*p.logger, id)()
+	//defer trace(*p.logger, id)()
 	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM "users" WHERE id = $1`
 
 	var res user.User
@@ -187,38 +187,6 @@ func (p *db) FindOneByNickName(nickname string) (u user.User, err error) {
 	}
 
 	return res, nil
-}
-
-func (p *db) GetAll() (users []user.User, err error) {
-	query := `SELECT id, nickname, firstname, lastname, gender, pass, status FROM users`
-
-	conn, err := p.pool.Acquire(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
-
-	rows, err := conn.Query(context.Background(), query)
-	if err != nil {
-		return nil, err
-	}
-
-	users = make([]user.User, 0)
-
-	for rows.Next() {
-		var u user.User
-		err = rows.Scan(&u)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, u)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return users, nil
-
 }
 
 func (p *db) PingPool(ctx context.Context) error {

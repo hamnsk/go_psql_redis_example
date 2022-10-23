@@ -36,7 +36,7 @@ type Handler interface {
 }
 
 type respData struct {
-	w          http.ResponseWriter
+	w          *http.ResponseWriter
 	span       otrace.Span
 	statusCode int
 	httpMethod string
@@ -86,7 +86,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && limitVar != "" {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
@@ -110,7 +110,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && offsetVar != "" {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
@@ -134,7 +134,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
@@ -161,7 +161,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-NextCursor", fmt.Sprintf("%d", nextCursor))
 	w.Header().Set("X-PrevCursor", fmt.Sprintf("%d", prevCursor))
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusOK,
 		httpMethod: http.MethodGet,
@@ -198,7 +198,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := strconv.Atoi(id); err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodGet,
@@ -221,7 +221,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
@@ -238,7 +238,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	getUserRequestsSuccess.Inc()
 
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusOK,
 		httpMethod: http.MethodGet,
@@ -281,7 +281,7 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusBadRequest,
 			httpMethod: http.MethodPost,
@@ -297,7 +297,7 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	// after response increment prometheus metrics
 	createUserRequestsSuccess.Inc()
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusCreated,
 		httpMethod: http.MethodPost,
@@ -334,7 +334,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := strconv.Atoi(id); err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodPut,
@@ -363,7 +363,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodPut,
@@ -377,9 +377,9 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer updateUserRequestsSuccess.Inc()
+	updateUserRequestsSuccess.Inc()
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusOK,
 		httpMethod: http.MethodPut,
@@ -416,7 +416,7 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := strconv.Atoi(id); err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusTeapot,
 			httpMethod: http.MethodDelete,
@@ -440,7 +440,7 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodDelete,
@@ -454,13 +454,13 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
-	defer deleteUserRequestsSuccess.Inc()
+	deleteUserRequestsSuccess.Inc()
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusOK,
 		httpMethod: http.MethodDelete,
-		payload:    User{},
+		payload:    &User{},
 	})
 }
 
@@ -501,7 +501,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		h.handleErrorResponse(&respData{
-			w:          w,
+			w:          &w,
 			span:       span,
 			statusCode: http.StatusNotFound,
 			httpMethod: http.MethodGet,
@@ -514,7 +514,7 @@ func (h *userHandler) getUserByNickname(w http.ResponseWriter, r *http.Request) 
 	// after response increment prometheus metrics
 	getUserRequestsSuccess.Inc()
 	h.handleSuccessResponse(&respData{
-		w:          w,
+		w:          &w,
 		span:       span,
 		statusCode: http.StatusOK,
 		httpMethod: http.MethodGet,
@@ -535,7 +535,7 @@ func (h *userHandler) handleErrorResponse(he *respData) {
 	// after response increment prometheus metrics
 	httpStatusCodes.WithLabelValues(strconv.Itoa(he.statusCode), he.httpMethod).Inc()
 	//render result to client
-	renderJSON(he.w, &AppError{Message: fmt.Sprintf("request processing ended with an error, "+
+	renderJSON(*he.w, &AppError{Message: fmt.Sprintf("request processing ended with an error, "+
 		"contact support by passing them the request ID: %s", traceId)}, he.statusCode)
 	h.UserService.error(he.payload.(error))
 }
@@ -544,7 +544,7 @@ func (h *userHandler) handleSuccessResponse(hs *respData) {
 	// after response increment prometheus metrics
 	httpStatusCodes.WithLabelValues(strconv.Itoa(hs.statusCode), hs.httpMethod).Inc()
 	//render result to client
-	renderJSON(hs.w, &hs.payload, hs.statusCode)
+	renderJSON(*hs.w, &hs.payload, hs.statusCode)
 	hs.span.SetStatus(codes.Code(hs.statusCode), "All ok!")
 }
 
