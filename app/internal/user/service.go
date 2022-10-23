@@ -110,7 +110,6 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 }
 
 // Get all users from DB
-// TODO: Implement caching in redis
 func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, err error) {
 	opts := newTracerOpts()
 
@@ -155,17 +154,16 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 	defer trace(s.logger, "findAll", &cstatus, traceId)()
 
 	//after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.SetAll(context.Background(), offset, users)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug(fmt.Sprintf("Write to cache users by offset: %d", offset))
-		setInCacheSpan.End()
 
-	}()
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.SetAll(context.Background(), offset, users)
+	if err != nil {
+		s.logger.Error(err.Error())
+		setInCacheSpan.End()
+	}
+	s.logger.Debug(fmt.Sprintf("Write to cache users by offset: %d", offset))
+	setInCacheSpan.End()
+
 	getFromDBSpan.End()
 	return users, nil
 }
@@ -191,17 +189,14 @@ func (s *service) delete(id string, ctx context.Context) error {
 	defer trace(s.logger, fmt.Sprintf("delete id: %s", id), &cstatus, traceId)()
 
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, delInCacheSpan := tr.Start(parentDBCtx, "delInCache", opts...)
-		err = s.cache.Del(context.Background(), id)
-		if err != nil {
-			s.logger.Error(err.Error())
-			delInCacheSpan.End()
-		}
-		s.logger.Debug("Del from cache user by id: " + id)
+	_, delInCacheSpan := tr.Start(parentDBCtx, "delInCache", opts...)
+	err = s.cache.Del(context.Background(), id)
+	if err != nil {
+		s.logger.Error(err.Error())
 		delInCacheSpan.End()
-
-	}()
+	}
+	s.logger.Debug("Del from cache user by id: " + id)
+	delInCacheSpan.End()
 
 	deleteFromDBSpan.End()
 	return nil
@@ -229,17 +224,15 @@ func (s *service) create(u *User, ctx context.Context) error {
 	defer trace(s.logger, fmt.Sprintf("create id: %d", u.Id), &cstatus, traceId)()
 
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), *u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug(fmt.Sprintf("Write to cache user by id: %d", u.Id))
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.Set(context.Background(), *u)
+	if err != nil {
+		s.logger.Error(err.Error())
 		setInCacheSpan.End()
+	}
+	s.logger.Debug(fmt.Sprintf("Write to cache user by id: %d", u.Id))
+	setInCacheSpan.End()
 
-	}()
 	getFromDBSpan.End()
 	return nil
 }
@@ -269,17 +262,16 @@ func (s *service) update(u *User, ctx context.Context) error {
 	defer trace(s.logger, id, &cstatus, traceId)()
 
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), *u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug("Write to cache user by id: " + id)
-		setInCacheSpan.End()
 
-	}()
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.Set(context.Background(), *u)
+	if err != nil {
+		s.logger.Error(err.Error())
+		setInCacheSpan.End()
+	}
+	s.logger.Debug("Write to cache user by id: " + id)
+	setInCacheSpan.End()
+
 	updateInDBSpan.End()
 	return nil
 }

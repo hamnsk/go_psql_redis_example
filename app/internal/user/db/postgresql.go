@@ -139,7 +139,11 @@ func (p *db) FindOne(id string) (u user.User, err error) {
 }
 
 func (p *db) Update(u *user.User) error {
-	query := `UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7`
+	//	query := `UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7`
+
+	query := `DO $$ BEGIN IF EXISTS (SELECT nickname FROM "users" WHERE id=$7) THEN
+UPDATE "users" SET nickname=$1, firstname=$2, lastname=$3, gender=$4, pass=$5, status=$6 WHERE id=$7; END IF; END$$`
+
 	conn, err := p.pool.Acquire(context.Background())
 	if err != nil {
 		return err

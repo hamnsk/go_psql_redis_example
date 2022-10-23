@@ -11,10 +11,10 @@ Content-Type: application/json
 }
 
 ### UpdateUser
-PUT http://localhost:8080/user/5343
+PUT http://localhost:8080/user/53566
 Content-Type: application/json
 
-{ "nickname":"restCreate0004",
+{ "nickname":"restCreate0009",
   "firstname":"restUser",
   "lastname":"restUser",
   "gender":"male",
@@ -23,11 +23,11 @@ Content-Type: application/json
 }
 
 ### GetUser
-GET http://localhost:8080/user/5342
+GET http://localhost:8080/user/53566
 Accept: application/json
 
 ### DeleteUser
-DELETE http://localhost:8080/user/5342
+DELETE http://localhost:8080/user/gfhdfgh
 Accept: application/json
 
 
