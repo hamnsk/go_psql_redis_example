@@ -60,26 +60,25 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 
 	traceId := span.SpanContext().TraceID().String()
 
+	defer trace(s.logger, fmt.Sprintf("findOne id: %s", id), &cstatus, traceId)()
+
 	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
 	u, err = s.cache.Get(context.Background(), id)
 	if err == nil {
 		s.logger.Debug("Cache hit for user id: " + id)
 		cstatus = "HIT"
 
-		defer trace(s.logger, fmt.Sprintf("findOne id: %s", id), &cstatus, traceId)()
-
 		// after success get user from cache refresh expire time for him
-		defer func() {
-			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
+		_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
 
-			err := s.cache.Expire(context.Background(), id)
-			if err != nil {
-				s.logger.Error("Set cache expiration failed for user id: " + id)
-				s.error(err)
-				setExpireInCache.End()
-			}
+		err := s.cache.Expire(context.Background(), id)
+		if err != nil {
+			s.logger.Error("Set cache expiration failed for user id: " + id)
+			s.error(err)
 			setExpireInCache.End()
-		}()
+		}
+		setExpireInCache.End()
+
 		getFromCacheSpan.End()
 		return u, nil
 	}
@@ -92,25 +91,20 @@ func (s *service) findOne(id string, ctx context.Context) (u User, err error) {
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", id, err)
 	}
-	defer trace(s.logger, fmt.Sprintf("findOne id: %s", id), &cstatus, traceId)()
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug("Write to cache user by id: " + id)
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.Set(context.Background(), u)
+	if err != nil {
+		s.logger.Error(err.Error())
 		setInCacheSpan.End()
-
-	}()
+	}
+	s.logger.Debug("Write to cache user by id: " + id)
+	setInCacheSpan.End()
 	getFromDBSpan.End()
 	return u, nil
 }
 
 // Get all users from DB
-// TODO: Implement caching in redis
 func (s *service) findAll(limit, offset int64, ctx context.Context) (users []User, err error) {
 	opts := newTracerOpts()
 
@@ -121,23 +115,26 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 
 	traceId := span.SpanContext().TraceID().String()
 
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
+	defer trace(s.logger, fmt.Sprintf("findAll limit, offset: %d , %d", limit, offset), &cstatus, traceId)()
+
 	parentCacheCtx, getFromCacheSpan := tr.Start(parentCtx, "getFromCache", opts...)
-	users, err = s.cache.GetAll(context.Background(), offset)
+	key := fmt.Sprintf("ALL_USERS_BY_LIMIT_OFFSET%d%d", limit, offset)
+	users, err = s.cache.GetAll(context.Background(), key)
 	if err == nil {
 		s.logger.Debug(fmt.Sprintf("Cache hit for users by offset: %d", offset))
 		cstatus = "HIT"
-		// after success get user from cache refresh expire time for him
-		defer func() {
-			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
 
-			err := s.cache.ExpireAll(context.Background(), offset)
-			if err != nil {
-				s.logger.Error(fmt.Sprintf("Set cache expiration failed for get all users offset: %d", offset))
-				s.error(err)
-				setExpireInCache.End()
-			}
+		// after success get user from cache refresh expire time for him
+		_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
+
+		err := s.cache.ExpireAll(context.Background(), key)
+		if err != nil {
+			s.logger.Error(fmt.Sprintf("Set cache expiration failed for get all users offset: %d", offset))
+			s.error(err)
 			setExpireInCache.End()
-		}()
+		}
+		setExpireInCache.End()
 		getFromCacheSpan.End()
 		return users, nil
 	}
@@ -151,21 +148,17 @@ func (s *service) findAll(limit, offset int64, ctx context.Context) (users []Use
 		return []User{}, fmt.Errorf("failed to get users. error: %w", err)
 	}
 
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, "findAll", &cstatus, traceId)()
-
 	//after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.SetAll(context.Background(), offset, users)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug(fmt.Sprintf("Write to cache users by offset: %d", offset))
-		setInCacheSpan.End()
 
-	}()
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.SetAll(context.Background(), key, users)
+	if err != nil {
+		s.logger.Error(err.Error())
+		setInCacheSpan.End()
+	}
+	s.logger.Debug(fmt.Sprintf("Write to cache users by offset: %d", offset))
+	setInCacheSpan.End()
+
 	getFromDBSpan.End()
 	return users, nil
 }
@@ -181,27 +174,24 @@ func (s *service) delete(id string, ctx context.Context) error {
 
 	traceId := span.SpanContext().TraceID().String()
 
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
+	defer trace(s.logger, fmt.Sprintf("delete id: %s", id), &cstatus, traceId)()
+
 	parentDBCtx, deleteFromDBSpan := tr.Start(parentCtx, "deleteFromDB", opts...)
 	err := s.storage.Delete(id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user by id=%s. error: %w", id, err)
 	}
 
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, fmt.Sprintf("delete id: %s", id), &cstatus, traceId)()
-
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, delInCacheSpan := tr.Start(parentDBCtx, "delInCache", opts...)
-		err = s.cache.Del(context.Background(), id)
-		if err != nil {
-			s.logger.Error(err.Error())
-			delInCacheSpan.End()
-		}
-		s.logger.Debug("Del from cache user by id: " + id)
+	_, delInCacheSpan := tr.Start(parentDBCtx, "delInCache", opts...)
+	err = s.cache.Del(context.Background(), id)
+	if err != nil {
+		s.logger.Error(err.Error())
 		delInCacheSpan.End()
-
-	}()
+	}
+	s.logger.Debug("Del from cache user by id: " + id)
+	delInCacheSpan.End()
 
 	deleteFromDBSpan.End()
 	return nil
@@ -219,6 +209,7 @@ func (s *service) create(u *User, ctx context.Context) error {
 	traceId := span.SpanContext().TraceID().String()
 
 	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
+	defer trace(s.logger, fmt.Sprintf("create id: %d", u.Id), &cstatus, traceId)()
 
 	parentDBCtx, getFromDBSpan := tr.Start(parentCtx, "createInDB", opts...)
 	err := s.storage.Create(u)
@@ -226,20 +217,16 @@ func (s *service) create(u *User, ctx context.Context) error {
 		return fmt.Errorf("failed to create user. error: %w", err)
 	}
 
-	defer trace(s.logger, fmt.Sprintf("create id: %d", u.Id), &cstatus, traceId)()
-
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), *u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug(fmt.Sprintf("Write to cache user by id: %d", u.Id))
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.Set(context.Background(), *u)
+	if err != nil {
+		s.logger.Error(err.Error())
 		setInCacheSpan.End()
+	}
+	s.logger.Debug(fmt.Sprintf("Write to cache user by id: %d", u.Id))
+	setInCacheSpan.End()
 
-	}()
 	getFromDBSpan.End()
 	return nil
 }
@@ -256,6 +243,9 @@ func (s *service) update(u *User, ctx context.Context) error {
 
 	traceId := span.SpanContext().TraceID().String()
 
+	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
+	defer trace(s.logger, fmt.Sprintf("update id: %d", u.Id), &cstatus, traceId)()
+
 	id := strconv.FormatInt(u.Id, 10)
 
 	parentDBCtx, updateInDBSpan := tr.Start(parentCtx, "updateInDB", opts...)
@@ -265,21 +255,17 @@ func (s *service) update(u *User, ctx context.Context) error {
 		return fmt.Errorf("failed to update user. error: %w", err)
 	}
 
-	// log time duration for all operations steps without lock/unlock mutex and init prometheus metrics (clean time for get entity)
-	defer trace(s.logger, id, &cstatus, traceId)()
-
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		err = s.cache.Set(context.Background(), *u)
-		if err != nil {
-			s.logger.Error(err.Error())
-			setInCacheSpan.End()
-		}
-		s.logger.Debug("Write to cache user by id: " + id)
-		setInCacheSpan.End()
 
-	}()
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	err = s.cache.Set(context.Background(), *u)
+	if err != nil {
+		s.logger.Error(err.Error())
+		setInCacheSpan.End()
+	}
+	s.logger.Debug("Write to cache user by id: " + id)
+	setInCacheSpan.End()
+
 	updateInDBSpan.End()
 	return nil
 }
@@ -302,15 +288,13 @@ func (s *service) findByNickname(nickname string, ctx context.Context) (u User, 
 	if err == nil {
 		cstatus = "HIT"
 		// after success get user from cache refresh expire time for him
-		defer func() {
-			_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
-			defer setExpireInCache.End()
-			err := s.cache.Expire(context.Background(), nickname)
-			if err != nil {
-				s.logger.Error("Set cache expiration failed for user nickname: " + nickname)
-				s.error(err)
-			}
-		}()
+		_, setExpireInCache := tr.Start(parentCacheCtx, "setCacheExpiration", opts...)
+		defer setExpireInCache.End()
+		err := s.cache.Expire(context.Background(), nickname)
+		if err != nil {
+			s.logger.Error("Set cache expiration failed for user nickname: " + nickname)
+			s.error(err)
+		}
 		return u, nil
 	}
 	cstatus = "MISS"
@@ -322,15 +306,15 @@ func (s *service) findByNickname(nickname string, ctx context.Context) (u User, 
 		return User{}, fmt.Errorf("failed to get user by id=%s. error: %w", nickname, err)
 	}
 	// after get user from storage place him to cache with ttl
-	defer func() {
-		_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
-		defer setInCacheSpan.End()
-		err = s.cache.SetByNickname(context.Background(), u)
-		if err != nil {
-			s.logger.Error(err.Error())
-		}
-		s.logger.Debug("Write to cache user by nickname: " + nickname)
-	}()
+
+	_, setInCacheSpan := tr.Start(parentDBCtx, "setInCache", opts...)
+	defer setInCacheSpan.End()
+	err = s.cache.SetByNickname(context.Background(), u)
+	if err != nil {
+		s.logger.Error(err.Error())
+	}
+	s.logger.Debug("Write to cache user by nickname: " + nickname)
+
 	return u, nil
 }
 
