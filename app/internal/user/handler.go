@@ -119,6 +119,7 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 	convertAtoiSpan.End()
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	defer userServiceCallSpan.End()
 	workHash := fmt.Sprintf("findAllUser:%d%d", limit, offset)
 	sflight := h.UserService.getSingleFlightGroup()
 	//// call user service to get requested user from cache, if not found get from storage and place to cache
@@ -136,10 +137,8 @@ func (h *userHandler) findAllUsers(w http.ResponseWriter, r *http.Request) {
 		})
 		// after response increment prometheus metrics
 		getAllUsersRequestsError.Inc()
-		userServiceCallSpan.End()
 		return
 	}
-	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
 	getAllUsersRequestsSuccess.Inc()
@@ -200,6 +199,7 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 	convertAtoiSpan.End()
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	defer userServiceCallSpan.End()
 	workHash := fmt.Sprintf("getUserByID:%s", id)
 	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
@@ -217,10 +217,8 @@ func (h *userHandler) findOneUser(w http.ResponseWriter, r *http.Request) {
 		})
 		// after response increment prometheus metrics
 		getUserRequestsError.Inc()
-		userServiceCallSpan.End()
 		return
 	}
-	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
 	getUserRequestsSuccess.Inc()
@@ -254,6 +252,7 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	parseBody(r, user)
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	defer userServiceCallSpan.End()
 	workHash := fmt.Sprintf("createUser:%s%s%s", user.FistName, user.LastName, user.NickName)
 	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
@@ -271,10 +270,8 @@ func (h *userHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		})
 		// after response increment prometheus metrics
 		createUserRequestsError.Inc()
-		userServiceCallSpan.End()
 		return
 	}
-	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
 	createUserRequestsSuccess.Inc()
@@ -329,6 +326,7 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	defer userServiceCallSpan.End()
 	workHash := fmt.Sprintf("updateUserByID:%s", id)
 	sflight := h.UserService.getSingleFlightGroup()
 	// call user service to get requested user from cache, if not found get from storage and place to cache
@@ -346,10 +344,8 @@ func (h *userHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 		})
 		// after response increment prometheus metrics
 		updateUserRequestsError.Inc()
-		userServiceCallSpan.End()
 		return
 	}
-	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
 	updateUserRequestsSuccess.Inc()
@@ -399,6 +395,7 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	convertAtoiSpan.End()
 
 	callUserServiceCtx, userServiceCallSpan := tr.Start(parentCtx, "CallUserService", opts...)
+	defer userServiceCallSpan.End()
 	workHash := fmt.Sprintf("deleteUser:%s", id)
 	sflight := h.UserService.getSingleFlightGroup()
 
@@ -417,10 +414,8 @@ func (h *userHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 		})
 		// after response increment prometheus metrics
 		deleteUserRequestsError.Inc()
-		userServiceCallSpan.End()
 		return
 	}
-	userServiceCallSpan.End()
 
 	// after response increment prometheus metrics
 	deleteUserRequestsSuccess.Inc()
