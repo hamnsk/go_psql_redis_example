@@ -111,7 +111,7 @@ func (a *app) startAppHTTPServer() {
 
 func (a *app) startMonHTTPServer() {
 	hc := healthcheck.NewHandler()
-	hc.AddLivenessCheck("goroutine-threshold", user.GoroutineCountCheck(10))
+	hc.AddLivenessCheck("goroutine-threshold", user.GoroutineCountCheck(1000))
 	hc.AddReadinessCheck("database", user.DatabasePingCheck(a.storage, 1*time.Second))
 	hc.AddReadinessCheck("cache", user.CachePingCheck(a.cache, 1*time.Second))
 	metricsHandler := monitoring.GetHandler(a.logger)
