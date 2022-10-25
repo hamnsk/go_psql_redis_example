@@ -1,20 +1,28 @@
-
-
 builds:
   - main: app/cmd/redis-cache-example/main.go
     binary: process-exporter
     flags: -tags netgo
+    env:
+      - CGO_ENABLED=0
     ldflags:
       - -s -w
       - -X github.com/prometheus/common/version.BuildTime={{.Date}}
       - -X redis/internal/version.Commit={{.FullCommit}}
       - -X redis/internal/version.Version={{.Version}}
-
     goos:
       - linux
-      - darwin64
+      - darwin
     goarch:
       - amd64
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: linux
+        goarch: arm
+      - goos: windows
+        goarch: 386
+      - goos: windows
+        goarch: amd64
 archives:
   - name_template: "redis-cache-example-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ end }}"
     wrap_in_directory: true
@@ -29,8 +37,6 @@ nfpms:
       - deb
       - rpm
     bindir: /opt/rcache
-    contents: []
-    scripts: []
 release:
   github:
     owner: hamnsk
