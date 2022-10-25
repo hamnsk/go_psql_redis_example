@@ -1,5 +1,5 @@
 builds:
-  - main: app/cmd/redis-cache-example/main.go
+  - main: cmd/redis-cache-example/main.go
     binary: process-exporter
     flags: -tags netgo
     env:
