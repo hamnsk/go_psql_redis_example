@@ -1,11 +1,12 @@
 SERVICE_NAME := "redis-cache-example"
 CURRENT_DIR = $(shell pwd)
 GOPATH = $(shell echo ${HOME})
-ifdef BUILD_VERSION
-	VERSION := "-$(BUILD_VERSION)"
-else
-	VERSION := ""
-endif
+RELEASE ?=devel
+COMMIT := git-$(shell git rev-parse --short HEAD)
+BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+
+GOOS?=linux
+GOARCH?=amd64
 
 .SILENT:
 
@@ -52,10 +53,18 @@ initdb:
 	  psql -U rexamp -d redisexamp -f /tmp/sql/initdb.sql
 
 build: clean deps
-	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
+	cd ${CURRENT_DIR}/app && GOOS=${GOOS} GOARCH=${GOARCH} go build -mod=readonly \
+	-ldflags "-s -w -X 'redis/internal/version.Version=${RELEASE}' \
+	-X 'redis/internal/version.Commit=${COMMIT}' \
+	-X 'redis/internal/version.BuildTime=${BUILD_TIME}'" \
+	-o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
 
 dbuild: clean deps
-	cd ${CURRENT_DIR}/app && CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go
+	cd ${CURRENT_DIR}/app && GOOS=${GOOS} GOARCH=${GOARCH} go build \
+	-ldflags "-s -w -X 'redis/internal/version.Version=${RELEASE}' \
+	-X 'redis/internal/version.Commit=${COMMIT}' \
+	-X 'redis/internal/version.BuildTime=${BUILD_TIME}'" \
+	-gcflags="all=-N -l" -o ./.bin/${SERVICE_NAME}${VERSION} ./cmd/${SERVICE_NAME}/main.go \
 
 run: clean clean-docker deps postgres redis initdb jaeger
 	cd ${CURRENT_DIR}/app && \

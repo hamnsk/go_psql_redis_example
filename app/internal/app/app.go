@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/heptiolabs/healthcheck"
@@ -13,6 +14,7 @@ import (
 	"redis/internal/user"
 	"redis/internal/user/cache"
 	psql "redis/internal/user/db"
+	"redis/internal/version"
 	"redis/pkg/logging"
 	"redis/pkg/monitoring"
 	"redis/pkg/tracing"
@@ -55,7 +57,7 @@ func (a *app) initCache() {
 
 func (a *app) initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
-		Release:     "redis-go@1.0.0",
+		Release:     fmt.Sprintf("redis-go@%s", version.Version),
 		Environment: "production",
 		Dsn:         os.Getenv("SENTRY_DSN"),
 	})
@@ -196,6 +198,7 @@ func (a *app) fatalServer(err error) {
 
 func newApp() *app {
 	logger := logging.GetLogger()
+	logger.Info("Start application...", logger.String("version", version.Version), logger.String("build_time", version.BuildTime), logger.String("commit", version.Commit))
 	logger.Info("Application logger initialized.")
 	router := mux.NewRouter()
 	router.Use(user.PrometheusHTTPDurationMiddleware, logging.ResponseCodeMiddleware(logger))

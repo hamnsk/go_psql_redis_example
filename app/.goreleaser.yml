@@ -1,0 +1,39 @@
+
+
+builds:
+  - main: app/cmd/redis-cache-example/main.go
+    binary: process-exporter
+    flags: -tags netgo
+    ldflags:
+      - -s -w
+      - -X github.com/prometheus/common/version.BuildTime={{.Date}}
+      - -X redis/internal/version.Commit={{.FullCommit}}
+      - -X redis/internal/version.Version={{.Version}}
+
+    goos:
+      - linux
+      - darwin64
+    goarch:
+      - amd64
+archives:
+  - name_template: "redis-cache-example-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ end }}"
+    wrap_in_directory: true
+checksum:
+  name_template: checksums.txt
+nfpms:
+  - homepage: https://github.com/hamnsk/go_psql_redis_example
+    maintainer: s.andrynin@gmail.com
+    description: Redis Cache Example
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /opt/rcache
+    contents: []
+    scripts: []
+release:
+  github:
+    owner: hamnsk
+    name: go_psql_redis_example
+  draft: false
+  prerelease: false
