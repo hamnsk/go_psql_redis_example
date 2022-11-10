@@ -65,6 +65,14 @@ _deps
 /fluent-bit
 /monitoring
 /sql
+/jaeger
+/nginx
+/otelcol
 .env
 docker-compose.yml
 app.log
+README.md
+requests.http
+stress.sh
+.gitignore
+LICENSE

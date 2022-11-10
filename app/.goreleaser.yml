@@ -1,6 +1,6 @@
 builds:
   - main: cmd/redis-cache-example/main.go
-    binary: process-exporter
+    binary: redis-cache
     flags: -tags netgo
     env:
       - CGO_ENABLED=0
@@ -28,6 +28,8 @@ dockers:
       - "gcr.io/hamnsk/redis-cache:{{ .Version }}"
       - "gcr.io/hamnsk/redis-cache:latest"
     dockerfile: '../Dockerfile'
+    build_flag_templates:
+      - "--platform=linux/amd64"
 archives:
   - name_template: "redis-cache-example-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true
