@@ -3,7 +3,7 @@ COPY . /usr/local/go/src/redis-cache
 WORKDIR /usr/local/go/src/redis-cache
 
 RUN go clean --modcache
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -o redis-cache cmd/redis-cache-example/main.go
+RUN GOROOT=/usr/local/go CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -o redis-cache cmd/redis-cache-example/main.go
 
 FROM scratch
 ENV DATABASE_URL=db
