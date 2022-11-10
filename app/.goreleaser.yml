@@ -25,8 +25,8 @@ builds:
         goarch: amd64
 dockers:
   - image_templates:
-      - "gcr.io/hamnsk/redis-cache:{{ .Version }}"
-      - "gcr.io/hamnsk/redis-cache:latest"
+      - "ghcr.io/hamnsk/redis-cache:{{ .Version }}"
+      - "ghcr.io/hamnsk/redis-cache:latest"
     dockerfile: 'Dockerfile'
     build_flag_templates:
       - "--platform=linux/amd64"
