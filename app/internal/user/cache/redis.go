@@ -14,7 +14,7 @@ import (
 
 var _ user.Cache = &cache{}
 
-const KeepAlivePollPeriod = 3
+const KeepAlivePollPeriod = 60
 
 type cache struct {
 	client *redis.Client
@@ -25,8 +25,8 @@ func dial() *redis.Client {
 	return redis.NewClient(&redis.Options{
 		Addr:        os.Getenv("REDIS"),
 		DB:          0,
-		DialTimeout: 100 * time.Millisecond,
-		ReadTimeout: 100 * time.Millisecond,
+		DialTimeout: 600 * time.Second,
+		ReadTimeout: 600 * time.Second,
 	})
 }
 

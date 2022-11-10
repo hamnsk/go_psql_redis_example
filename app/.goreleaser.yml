@@ -23,6 +23,11 @@ builds:
         goarch: 386
       - goos: windows
         goarch: amd64
+dockers:
+  - image_templates:
+      - "gcr.io/hamnsk/redis-cache:{{ .Version }}"
+      - "gcr.io/hamnsk/redis-cache:latest"
+    dockerfile: '../Dockerfile'
 archives:
   - name_template: "redis-cache-example-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true

@@ -108,10 +108,10 @@ stress:
 
 stress-1:
 	echo "begin stress"; \
-	/tmp/bin/gobench -u http://192.168.1.109/user/1245 -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/4567 -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/hdfgfgh -k=true -c 100 -t 60 & \
-	/tmp/bin/gobench -u http://192.168.1.109/user/647564 -k=true -c 100 -t 60 & \
+	/tmp/bin/gobench -u http://192.168.1.108/user/1245 -k=true -c 900 -t 120 & \
+	/tmp/bin/gobench -u http://192.168.1.108/user/4567 -k=true -c 900 -t 120 \
+	/tmp/bin/gobench -u http://192.168.1.108/user/hdfgfgh -k=true -c 100 -t 20 & \
+	/tmp/bin/gobench -u http://192.168.1.108/user/647564 -k=true -c 100 -t 20 & \
 	wait; \
 	echo "done"
 
