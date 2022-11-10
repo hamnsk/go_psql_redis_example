@@ -27,7 +27,7 @@ dockers:
   - image_templates:
       - "gcr.io/hamnsk/redis-cache:{{ .Version }}"
       - "gcr.io/hamnsk/redis-cache:latest"
-    dockerfile: '../Dockerfile'
+    dockerfile: 'Dockerfile'
     build_flag_templates:
       - "--platform=linux/amd64"
 archives:
